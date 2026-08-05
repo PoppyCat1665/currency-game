@@ -246,6 +246,9 @@ function renderLabels() {
   // Clear
   labelsG.selectAll("text.label").remove();
 
+  // "Show Country Names on Map" is off — don't draw labels.
+  if (!game || !game.showCountryNames) return;
+
   const placed = [];
   const minGap = 22;                  // min px distance between labels (screen space)
   const baseMinArea = 30;             // min projected area at zoom=1 (px^2)
@@ -344,6 +347,8 @@ function handleMapClick(event) {
 }
 
 function showTooltip(event, name) {
+  // "Show Country Names on Map" is off — no hover name either.
+  if (!game || !game.showCountryNames) return;
   const tip = $("#tooltip");
   tip.textContent = name;
   tip.classList.remove("hidden");
@@ -515,6 +520,7 @@ function startGame() {
 
   // Read display & sound preferences for this session
   const showFullName = $("#showFullNameInput").checked;
+  const showCountryNames = $("#showCountryNamesInput").checked;
   soundsEnabled = $("#soundInput").checked;
 
   // Browsers block audio until a user gesture; Start click counts as one.
@@ -533,6 +539,7 @@ function startGame() {
     intervalMs: intervalSec * 1000,
     maxGuesses,
     showFullName,
+    showCountryNames,
     totalStart: performance.now(),
     totalTimerId: null,
     guessTimerId: null,
