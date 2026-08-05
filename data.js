@@ -1,0 +1,50 @@
+// Currency data mapping currencies to countries.
+// Each entry: { code, name, symbol, countries: [ISO3166-1 numeric ids used by world-atlas map] }
+// If a currency is used by multiple countries, all ids are listed and any is accepted.
+const CURRENCIES = [
+  { code: "ALL",  name: "Albanian Lek",     symbol: "L",                        countries: [8] },
+  { code: "ARS",  name: "Argentine Peso",   symbol: "$",                        countries: [32] },
+  { code: "AUD",  name: "Australian Dollar",symbol: "A$",                       countries: [36, 296, 520] },
+  { code: "BGN",  name: "Bulgarian Lev",    symbol: "лв",                       countries: [100] },
+  { code: "BHD",  name: "Bahraini Dinar",   symbol: ".د.ب",                      countries: [48] },
+  { code: "BRL",  name: "Brazilian Real",   symbol: "R$",                       countries: [76] },
+  { code: "CAD",  name: "Canadian Dollar",  symbol: "C$",                       countries: [124] },
+  { code: "CHF",  name: "Swiss Franc",      symbol: "Fr",                       countries: [756] },
+  { code: "CLP",  name: "Chilean Peso",     symbol: "$",                        countries: [152] },
+  { code: "CNY",  name: "Chinese Yuan (Renminbi)", symbol: "¥",                 countries: [156] },
+  { code: "COP",  name: "Colombian Peso",   symbol: "$",                        countries: [170] },
+  { code: "DKK",  name: "Danish Krone",     symbol: "kr",                       countries: [208, 234, 304] },
+  { code: "EUR",  name: "Euro",             symbol: "€",                        countries: [40, 56, 191, 196, 233, 246, 250, 276, 300, 372, 380, 428, 440, 442, 470, 528, 620, 703, 705, 724] },
+  { code: "GBP",  name: "Pound Sterling",   symbol: "£",                        countries: [826] },
+  // Hong Kong is part of China (id 156) on this world map, so China is the click target.
+  { code: "HKD",  name: "Hong Kong Dollar", symbol: "HK$",                      countries: [156] },
+  { code: "HUF",  name: "Hungarian Forint", symbol: "Ft",                       countries: [348] },
+  { code: "IDR",  name: "Indonesian Rupiah",symbol: "Rp",                       countries: [360] },
+  { code: "ILS",  name: "Israeli New Shekel",symbol: "₪",                       countries: [376] },
+  { code: "INR",  name: "Indian Rupee",     symbol: "₹",                        countries: [356] },
+  { code: "ISK",  name: "Icelandic Króna",  symbol: "kr",                       countries: [352] },
+  { code: "JPY",  name: "Japanese Yen",     symbol: "¥",                        countries: [392] },
+  { code: "KRW",  name: "Korean Won",       symbol: "₩",                        countries: [410] },
+  { code: "MXN",  name: "Mexican Peso",     symbol: "$",                        countries: [484] },
+  { code: "MXV",  name: "Mexican UDI",      symbol: "UDI",                      countries: [484] },
+  { code: "MYR",  name: "Malaysian Ringgit",symbol: "RM",                       countries: [458] },
+  { code: "NAD",  name: "Namibian Dollar",  symbol: "N$",                       countries: [516] },
+  { code: "NGN",  name: "Nigerian Naira",   symbol: "₦",                        countries: [566] },
+  { code: "NOK",  name: "Norwegian Krone",  symbol: "kr",                       countries: [578] },
+  { code: "NZD",  name: "New Zealand Dollar",symbol: "NZ$",                     countries: [554] },
+  { code: "PEN",  name: "Peruvian Sol",     symbol: "S/",                       countries: [604] },
+  { code: "PHP",  name: "Philippine Peso",  symbol: "₱",                        countries: [608] },
+  { code: "RUB",  name: "Russian Rouble",   symbol: "₽",                        countries: [643] },
+  { code: "SAR",  name: "Saudi Riyal",      symbol: "﷼",                        countries: [682] },
+  { code: "SEK",  name: "Swedish Krona",    symbol: "kr",                       countries: [752] },
+  { code: "SGD",  name: "Singapore Dollar", symbol: "S$",                       countries: [702] },
+  { code: "THB",  name: "Thai Baht",        symbol: "฿",                        countries: [764] },
+  { code: "TRY",  name: "Turkish Lira",     symbol: "₺",                        countries: [792] },
+  { code: "TWD",  name: "New Taiwan Dollar",symbol: "NT$",                      countries: [158] },
+  { code: "USD",  name: "US Dollar",        symbol: "$",                        countries: [840, 630] },
+  { code: "VES",  name: "Bolívar Soberano", symbol: "Bs",                       countries: [862] },
+  { code: "VND",  name: "Vietnamese Dong",  symbol: "₫",                        countries: [704] },
+  { code: "XOF",  name: "CFA Franc (BCEAO)",symbol: "FCFA",                     countries: [204, 384, 466, 562, 624, 686, 768, 854] }
+];
+
+// All map countries excluded from the game are "distractors" that can be clicked.

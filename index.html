@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Currency Guessing Game</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ========== MAIN MENU ========== -->
+  <div id="menu" class="screen">
+    <div class="menu-card">
+      <h1>🌍 Currency Guessing Game</h1>
+      <p class="subtitle">A fast study tool to memorize currencies and their countries before your exam.</p>
+
+      <div class="settings">
+        <label class="setting">
+          <span>Guess Time</span>
+          <input id="guessTimeInput" type="number" min="1" max="120" step="1" value="7">
+          <span class="unit">seconds</span>
+        </label>
+        <label class="setting">
+          <span>Interval Time</span>
+          <input id="intervalTimeInput" type="number" min="0" max="60" step="1" value="3">
+          <span class="unit">seconds</span>
+        </label>
+        <label class="setting">
+          <span>Max Guesses</span>
+          <input id="maxGuessesInput" type="number" min="1" max="10" step="1" value="1">
+          <span class="unit">per question</span>
+        </label>
+        <label class="setting toggle">
+          <span>Show Full Currency Name</span>
+          <input id="showFullNameInput" type="checkbox" checked>
+        </label>
+        <label class="setting toggle">
+          <span>Sound Effects</span>
+          <input id="soundInput" type="checkbox" checked>
+        </label>
+      </div>
+
+      <button id="startBtn" class="btn primary">Start Game</button>
+      <p class="hint">You'll be shown a currency – click the country that uses it before time runs out.</p>
+    </div>
+  </div>
+
+  <!-- ========== GAMEPLAY ========== -->
+  <div id="game" class="screen hidden">
+    <header class="game-header">
+      <div class="hud">
+        <div class="currency-box" id="currencyBox">
+          <div class="currency-name" id="currencyName">–</div>
+          <div class="currency-symbol" id="currencySymbol">–</div>
+        </div>
+        <div class="hud-stats">
+          <div class="stat"><span class="stat-label">Score</span><span class="stat-value" id="score">0</span></div>
+          <div class="stat"><span class="stat-label">Guesses</span><span class="stat-value" id="guessesLeft">1</span></div>
+          <div class="stat"><span class="stat-label">Progress</span><span class="stat-value" id="progress">1 / 42</span></div>
+          <div class="stat"><span class="stat-label">Time</span><span class="stat-value" id="totalTime">0:00</span></div>
+        </div>
+        <button id="stopBtn" class="btn stop" title="Stop the current game and return to the menu">⏹ Stop</button>
+      </div>
+
+      <div class="timer-section">
+        <div class="timer-row">
+          <span class="timer-label">⏱ Guess Time</span>
+          <span class="timer-value" id="guessTimeLeft">7.0s</span>
+        </div>
+        <div class="timer-bar"><div class="timer-fill" id="guessBar"></div></div>
+      </div>
+
+      <div id="feedback" class="feedback hidden"></div>
+
+      <div id="intervalSection" class="timer-section hidden">
+        <div class="timer-row">
+          <span class="timer-label" id="intervalLabel">➡ Next question</span>
+          <span class="timer-value" id="intervalLeft">3.0s</span>
+        </div>
+        <div class="timer-bar"><div class="timer-fill" id="intervalBar"></div></div>
+      </div>
+    </header>
+
+    <div class="map-wrapper">
+      <svg id="map" role="img" aria-label="World map"></svg>
+      <div id="tooltip" class="hidden"></div>
+      <button id="resetViewBtn" class="btn small">Reset View</button>
+      <div id="mapLoading" class="map-loading">Loading map…</div>
+    </div>
+  </div>
+
+  <!-- ========== RESULTS ========== -->
+  <div id="results" class="screen hidden">
+    <div class="results-card">
+      <h1>🏁 Game Complete!</h1>
+      <div class="stats">
+        <div class="stat"><span class="stat-label">Final Score</span><span class="stat-value" id="finalScore">0</span></div>
+        <div class="stat"><span class="stat-label">Correct</span><span class="stat-value good" id="finalCorrect">0</span></div>
+        <div class="stat"><span class="stat-label">Incorrect</span><span class="stat-value bad" id="finalIncorrect">0</span></div>
+        <div class="stat"><span class="stat-label">Accuracy</span><span class="stat-value" id="finalAccuracy">0%</span></div>
+        <div class="stat"><span class="stat-label">Total Time</span><span class="stat-value" id="finalTime">0:00</span></div>
+        <div class="stat"><span class="stat-label">Avg / Question</span><span class="stat-value" id="finalAvg">0.0s</span></div>
+      </div>
+      <div class="results-buttons">
+        <button id="playAgainBtn" class="btn primary">Play Again</button>
+        <button id="mainMenuBtn" class="btn">Return to Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="lib/d3.min.js"></script>
+  <script src="lib/topojson.min.js"></script>
+  <script src="lib/world.js"></script>
+  <script src="data.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
