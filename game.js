@@ -310,7 +310,9 @@ function onCountryClick(event, d) {
 // Clicking the ocean (transparent layer under countries) snaps to the
 // nearest country centroid when within SNAP_RADIUS screen px, so tiny
 // countries are easy to hit even when their shape is small on screen.
-const SNAP_RADIUS = 14;
+// Generous radius: tiny island nations like Singapore have their centroid
+// in the water, far from their visible landmass, so we need extra reach.
+const SNAP_RADIUS = 30;
 
 function handleMapClick(event) {
   if (!game || game.phase !== "question") return;
