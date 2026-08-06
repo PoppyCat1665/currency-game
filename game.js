@@ -100,6 +100,36 @@ let pendingZoom = null;        // coalesced zoom transform (applied next frame)
 let zoomFrameScheduled = false;
 let svgW = 0, svgH = 0;        // cached viewport size
 
+// Sampled boundary points (lon/lat) per country, aligned with countryFeatures.
+// Used to turn a "click radius in km" into a real nearby-area hit test.
+let countryBoundaries = [];
+
+function buildCountryBoundaries() {
+  countryBoundaries = countryFeatures.map(f => {
+    const geom = f.geometry;
+    const polys = geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates];
+    const pts = [];
+    for (const poly of polys) {
+      const ring = poly[0]; // outer ring
+      if (!ring) continue;
+      const step = Math.max(1, Math.floor(ring.length / 40));
+      for (let i = 0; i < ring.length; i += step) pts.push(ring[i]);
+    }
+    return pts;
+  });
+}
+
+// Great-circle distance in km between two [lon, lat] points.
+function haversineKm(a, b) {
+  const R = 6371;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b[1] - a[1]);
+  const dLon = toRad(b[0] - a[0]);
+  const la1 = toRad(a[1]), la2 = toRad(b[1]);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+
 function initMap() {
   svg = d3.select("#map");
 
@@ -171,6 +201,13 @@ function initMap() {
       .on("mousemove", ev => moveTooltip(ev))
       .on("mouseover", (ev, d) => showTooltip(ev, d.properties.name))
       .on("mouseout", hideTooltip);
+
+  // The highlight group was created before the countries were appended to
+  // mapG, so it ended up underneath them. Re-append it last so answer rings
+  // always render on top of the world map.
+  highlightG.raise();
+
+  buildCountryBoundaries();
 
   window.addEventListener("resize", debounce(resizeMap, 150));
 
@@ -307,12 +344,10 @@ function onCountryClick(event, d) {
   }
 }
 
-// Clicking the ocean (transparent layer under countries) snaps to the
-// nearest country centroid when within SNAP_RADIUS screen px, so tiny
-// countries are easy to hit even when their shape is small on screen.
-// Generous radius: tiny island nations like Singapore have their centroid
-// in the water, far from their visible landmass, so we need extra reach.
-const SNAP_RADIUS = 30;
+// Clicking the ocean (transparent layer under countries) snaps to the nearest
+// country when the click is within the configurable nearby area. The radius is
+// set in the menu in kilometers, so tiny countries are easy to hit even when
+// their visible shape is a few pixels on screen.
 
 function handleMapClick(event) {
   if (!game || game.phase !== "question") return;
@@ -326,19 +361,24 @@ function handleMapClick(event) {
   const hx = (px - z.x) / z.k;
   const hy = (py - z.y) / z.k;
 
+  // Convert the click point to geographic lon/lat.
+  const geo = projection.invert([hx, hy]);
+  if (!geo || !isFinite(geo[0]) || !isFinite(geo[1])) return;
+
+  const radiusKm = (game.snapRadiusKm > 0) ? game.snapRadiusKm : 0;
+
   let best = null;
-  let bestDistSq = SNAP_RADIUS * SNAP_RADIUS;
+  let bestKm = Infinity;
 
   for (let i = 0; i < countryFeatures.length; i++) {
-    const f = countryFeatures[i];
-    const c = path.centroid(f);
-    if (!isFinite(c[0]) || !isFinite(c[1])) continue;
-    const dx = (hx - c[0]) * z.k;
-    const dy = (hy - c[1]) * z.k;
-    const d2 = dx * dx + dy * dy;
-    if (d2 <= bestDistSq) {
-      bestDistSq = d2;
-      best = f;
+    const pts = countryBoundaries[i];
+    if (!pts || pts.length === 0) continue;
+    for (let j = 0; j < pts.length; j++) {
+      const km = haversineKm(geo, pts[j]);
+      if (km <= radiusKm && km < bestKm) {
+        bestKm = km;
+        best = countryFeatures[i];
+      }
     }
   }
 
@@ -519,6 +559,7 @@ function startGame() {
   const guessSec = Math.max(1, parseInt($("#guessTimeInput").value, 10) || 7);
   const intervalSec = Math.max(0, parseInt($("#intervalTimeInput").value, 10) || 3);
   const maxGuesses = Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
+  const snapRadiusKm = Math.max(0, parseFloat($("#snapRadiusInput").value) || 150);
 
   // Read display & sound preferences for this session
   const showFullName = $("#showFullNameInput").checked;
@@ -540,6 +581,7 @@ function startGame() {
     guessMs: guessSec * 1000,
     intervalMs: intervalSec * 1000,
     maxGuesses,
+    snapRadiusKm,
     showFullName,
     showCountryNames,
     totalStart: performance.now(),

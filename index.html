@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Currency Guessing Game</title>
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 
@@ -29,6 +29,11 @@
           <span>Max Guesses</span>
           <input id="maxGuessesInput" type="number" min="1" max="10" step="1" value="1">
           <span class="unit">per question</span>
+        </label>
+        <label class="setting">
+          <span>Click Radius</span>
+          <input id="snapRadiusInput" type="number" min="0" max="1000" step="10" value="150">
+          <span class="unit">km nearby area</span>
         </label>
         <label class="setting toggle">
           <span>Show Full Currency Name</span>
@@ -112,10 +117,10 @@
     </div>
   </div>
 
-  <script src="lib/d3.min.js?v=3"></script>
-  <script src="lib/topojson.min.js?v=3"></script>
-  <script src="lib/world.js?v=3"></script>
-  <script src="data.js?v=3"></script>
-  <script src="game.js?v=3"></script>
+  <script src="lib/d3.min.js?v=4"></script>
+  <script src="lib/topojson.min.js?v=4"></script>
+  <script src="lib/world.js?v=4"></script>
+  <script src="data.js?v=4"></script>
+  <script src="game.js?v=4"></script>
 </body>
 </html>
