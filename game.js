@@ -153,7 +153,7 @@ function initMap() {
   mapG.append("path")
       .attr("class", "ocean")
       .attr("d", path({ type: "Sphere" }))
-      .on("click", handleMapClick);
+      .on("click", resolveQuestionByRadius);
 
   // Group for the circle markers drawn around highlighted countries.
   // Lives INSIDE mapG so rings inherit the zoom/pan transform and always
@@ -336,11 +336,13 @@ function debounce(fn, ms) {
 // ================= Map Interactions =================
 let game = null;
 
-// Clicking directly ON a country path resolves that exact country —
-// the SVG hit-testing already guarantees precision, no snapping needed.
-function onCountryClick(event, d) {
+// Every click — whether it lands directly on a country or on the ocean —
+// runs the radius-based resolution first. The circle (click radius around the
+// finger) takes priority over the exact country under the cursor, so if the
+// correct answer country is anywhere inside the radius it counts as correct.
+function onCountryClick(event) {
   if (game && game.phase === "question") {
-    resolveQuestion(d.id);
+    resolveQuestionByRadius(event);
   }
 }
 
@@ -349,7 +351,7 @@ function onCountryClick(event, d) {
 // set in the menu in kilometers, so tiny countries are easy to hit even when
 // their visible shape is a few pixels on screen.
 
-function handleMapClick(event) {
+function resolveQuestionByRadius(event) {
   if (!game || game.phase !== "question") return;
 
   const svgRect = svg.node().getBoundingClientRect();
