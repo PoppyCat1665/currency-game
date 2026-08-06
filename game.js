@@ -591,7 +591,10 @@ function startGame() {
   if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); }
 
   const guessSec = Math.max(1, parseInt($("#guessTimeInput").value, 10) || 7);
-  const intervalSec = Math.max(0, parseInt($("#intervalTimeInput").value, 10) || 3);
+  const intervalEnabled = $("#intervalToggleInput").checked;
+  const intervalSec = intervalEnabled
+    ? Math.max(0, parseInt($("#intervalTimeInput").value, 10) || 3)
+    : 0; // interval off -> skip straight to the next round
   const maxGuesses = Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
   const snapRadiusKm = Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
 
