@@ -549,9 +549,10 @@ function advanceInterval(isFinal) {
 // Using capture phase on document means it fires even if d3-zoom or a country
 // path handler swallows/stops the bubbled event on the map.
 function skipInterval() {
-  if (!game || game.phase !== "answered") return;
+  if (!game || game.phase !== "answered") return false;
   const isFinal = game.index === game.total - 1;
   advanceInterval(isFinal);
+  return true;
 }
 
 function startInterval(isFinal) {
@@ -808,9 +809,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Click anywhere on the game screen during the interval wait to skip it.
   // Button clicks (Stop, Reset View, etc.) are ignored so they still work.
-  // Capture phase runs before map handlers can stop propagation.
+  // Capture phase runs before map handlers. When a skip actually happens we
+  // stop propagation so the same click never registers as a map guess on the
+  // freshly shown next round.
   document.addEventListener("click", e => {
     if (e.target && e.target.closest && e.target.closest("button")) return;
-    skipInterval();
+    if (skipInterval()) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
   }, true);
 });
