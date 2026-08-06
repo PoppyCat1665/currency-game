@@ -753,6 +753,7 @@ function showResults() {
   $("#finalAccuracy").textContent = Math.round((game.correct / game.total) * 100) + "%";
   $("#finalTime").textContent = formatTime(game.totalElapsed || 0);
   $("#finalAvg").textContent = ((game.totalElapsed || 0) / 1000 / game.total).toFixed(1) + "s";
+  $("#finalRadius").textContent = game.snapRadiusKm + " km";
 
   showScreen("results");
 }
