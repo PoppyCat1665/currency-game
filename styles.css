@@ -413,6 +413,154 @@ input[type="number"] {
   font-size: 15px;
 }
 
+/* ---------- Player name & rank in menu ---------- */
+.rank-setting { margin-bottom: 18px; }
+
+.rank-setting input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0d1530;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.rank-setting input[type="text"]::placeholder { color: var(--muted); }
+
+.start-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.start-row .btn.primary { flex: 1; }
+
+/* Red, evil rank-mode toggle */
+.rank-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: 12px;
+  border: 1px solid #7f1d1d;
+  background: rgba(127, 29, 29, 0.15);
+  padding: 0 18px;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rank-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.rank-label {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #fca5a5;
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
+  white-space: nowrap;
+}
+
+.rank-toggle:hover { filter: brightness(1.15); }
+
+.rank-toggle:has(input:checked) {
+  background: rgba(220, 38, 38, 0.35);
+  border-color: #f87171;
+  box-shadow: 0 0 18px rgba(248, 113, 113, 0.45);
+}
+
+.rank-toggle:has(input:checked) .rank-label {
+  color: #ffdada;
+  text-shadow: 0 0 12px rgba(248, 113, 113, 0.9);
+  animation: rankPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes rankPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* ---------- Player name & rank badge in HUD ---------- */
+.hud-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.player-name-badge {
+  background: rgba(76, 201, 240, 0.12);
+  border: 1px solid var(--accent);
+  border-radius: 99px;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rankStat { border-color: rgba(248, 113, 113, 0.5); }
+
+.rank-badge {
+  color: #f87171;
+  text-shadow: 0 0 10px rgba(248, 113, 113, 0.6);
+}
+
+/* ---------- Countdown overlay ---------- */
+.countdown-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 10, 25, 0.72);
+  z-index: 20;
+}
+
+.countdown-text {
+  font-size: 120px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 30px rgba(76, 201, 240, 0.8), 0 0 60px rgba(76, 201, 240, 0.4);
+  animation: countPop 0.9s ease-in-out;
+}
+
+@keyframes countPop {
+  0% { transform: scale(2.2); opacity: 0; }
+  30% { transform: scale(0.9); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ---------- Results player/rank ---------- */
+.results-player {
+  margin-top: 14px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.results-rank {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #f87171;
+  text-shadow: 0 0 10px rgba(248, 113, 113, 0.6);
+}
+
 /* ---------- Results ---------- */
 .stats {
   display: grid;

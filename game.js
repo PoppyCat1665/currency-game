@@ -65,6 +65,14 @@ function playSound(name) {
   if (!ctx) return;
 
   switch (name) {
+    case "countdown":
+      playTone(660, 0, 0.12, "square", 0.15);
+      playTone(990, 0.12, 0.15, "square", 0.15);
+      break;
+    case "go":
+      playTone(1046, 0, 0.25, "square", 0.18);   // C6
+      playTone(1318, 0.2, 0.3, "square", 0.18);  // E6
+      break;
     case "correct":
       playTone(660, 0, 0.12, "sine", 0.2);
       playTone(880, 0.11, 0.18, "sine", 0.2);
@@ -588,15 +596,19 @@ function startInterval(isFinal) {
 function startGame() {
   // stop any running timers
   stopTotalTimer();
-  if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); }
+  if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); clearTimer(game.countdownTimerId); }
 
-  const guessSec = Math.max(1, parseInt($("#guessTimeInput").value, 10) || 7);
-  const intervalEnabled = $("#intervalToggleInput").checked;
+  const rankMode = $("#rankModeInput").checked;
+  const playerName = $("#playerNameInput").value.trim();
+
+  // Rank mode forces hard settings.
+  const guessSec = rankMode ? 5 : Math.max(1, parseInt($("#guessTimeInput").value, 10) || 7);
+  const intervalEnabled = rankMode ? false : $("#intervalToggleInput").checked;
   const intervalSec = intervalEnabled
     ? Math.max(0, parseInt($("#intervalTimeInput").value, 10) || 3)
     : 0; // interval off -> skip straight to the next round
-  const maxGuesses = Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
-  const snapRadiusKm = Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
+  const maxGuesses = rankMode ? 1 : Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
+  const snapRadiusKm = rankMode ? 10 : Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
 
   // Read display & sound preferences for this session
   const showFullName = $("#showFullNameInput").checked;
@@ -621,10 +633,13 @@ function startGame() {
     snapRadiusKm,
     showFullName,
     showCountryNames,
+    rankMode,
+    playerName,
     totalStart: performance.now(),
     totalTimerId: null,
     guessTimerId: null,
     intervalTimerId: null,
+    countdownTimerId: null,
     phase: "idle"
   };
 
@@ -646,7 +661,67 @@ function startGame() {
   $("#guessBar").classList.remove("low");
   $("#guessBar").style.width = "100%";
 
-  showQuestion();
+  // Player name badge + rank badge in the HUD
+  const nameEl = $("#playerNameDisplay");
+  if (playerName) {
+    nameEl.textContent = playerName;
+    nameEl.classList.remove("hidden");
+  } else {
+    nameEl.classList.add("hidden");
+  }
+  const rankStat = $("#rankStat");
+  rankStat.classList.toggle("hidden", !rankMode);
+  rankStat.classList.toggle("rankStat", rankMode);
+
+  if (rankMode) {
+    startRankCountdown();
+  } else {
+    showQuestion();
+  }
+}
+
+// Rank mode: 3 → 2 → 1 → START countdown. The map is unclickable
+// (phase stays "countdown") until the go signal, then the first
+// question begins and the clock starts.
+function startRankCountdown() {
+  clearTimer(game.countdownTimerId);
+  game.phase = "countdown";
+
+  const overlay = $("#countdownOverlay");
+  const text = $("#countdownText");
+  overlay.classList.remove("hidden");
+
+  const steps = [3, 2, 1];
+  let i = 0;
+
+  const tick = () => {
+    if (!game) return;
+    if (i < steps.length) {
+      text.textContent = steps[i];
+      text.style.animation = "none";
+      void text.offsetWidth; // restart the pop animation
+      text.style.animation = "";
+      playSound("countdown");
+      i++;
+    } else {
+      text.textContent = "START!";
+      text.style.color = "#4ade80";
+      text.style.textShadow = "0 0 30px rgba(74, 222, 128, 0.9), 0 0 60px rgba(74, 222, 128, 0.5)";
+      text.style.animation = "none";
+      void text.offsetWidth;
+      text.style.animation = "";
+      playSound("go");
+      overlay.classList.add("hidden");
+      text.style.color = "";
+      text.style.textShadow = "";
+      clearTimer(game.countdownTimerId);
+      showQuestion();
+      return;
+    }
+  };
+
+  tick();
+  game.countdownTimerId = setInterval(tick, 900);
 }
 
 function updateGuessesDisplay() {
@@ -771,6 +846,17 @@ function showResults() {
   $("#finalAvg").textContent = ((game.totalElapsed || 0) / 1000 / game.total).toFixed(1) + "s";
   $("#finalRadius").textContent = game.snapRadiusKm + " km";
 
+  // Player name + rank badge on the results screen
+  const pName = $("#finalPlayerName");
+  if (game.playerName) {
+    pName.textContent = "Player: " + game.playerName;
+    pName.classList.remove("hidden");
+  } else {
+    pName.classList.add("hidden");
+  }
+  const pRank = $("#finalRankBadge");
+  pRank.classList.toggle("hidden", !game.rankMode);
+
   showScreen("results");
 }
 
@@ -789,16 +875,18 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#startBtn").addEventListener("click", startGame);
   $("#playAgainBtn").addEventListener("click", startGame);
   $("#stopBtn").addEventListener("click", () => {
-    if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); }
+    if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); clearTimer(game.countdownTimerId); }
     stopTotalTimer();
+    $("#countdownOverlay").classList.add("hidden");
     if (zoomBehavior && svg) {
       svg.call(zoomBehavior.transform, d3.zoomIdentity);
     }
     showScreen("menu");
   });
   $("#mainMenuBtn").addEventListener("click", () => {
-    if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); }
+    if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); clearTimer(game.countdownTimerId); }
     stopTotalTimer();
+    $("#countdownOverlay").classList.add("hidden");
     if (zoomBehavior && svg) {
       svg.call(zoomBehavior.transform, d3.zoomIdentity);
     }

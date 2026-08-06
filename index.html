@@ -53,7 +53,18 @@
         </label>
       </div>
 
-      <button id="startBtn" class="btn primary">Start Game</button>
+      <label class="setting rank-setting">
+        <span>Player Name (optional)</span>
+        <input id="playerNameInput" type="text" maxlength="20" placeholder="Your name…">
+      </label>
+
+      <div class="start-row">
+        <button id="startBtn" class="btn primary">Start Game</button>
+        <label class="rank-toggle" title="Hard mode: 5s per question, 1 guess, tiny 10km click radius, no interval breaks">
+          <input id="rankModeInput" type="checkbox">
+          <span class="rank-label">😈 RANK</span>
+        </label>
+      </div>
       <p class="hint">You'll be shown a currency – click the country that uses it before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
       <p class="version" id="appVersion">v1.2.0</p>
@@ -73,8 +84,12 @@
           <div class="stat"><span class="stat-label">Guesses</span><span class="stat-value" id="guessesLeft">1</span></div>
           <div class="stat"><span class="stat-label">Progress</span><span class="stat-value" id="progress">1 / 42</span></div>
           <div class="stat"><span class="stat-label">Time</span><span class="stat-value" id="totalTime">0:00</span></div>
+          <div class="stat" id="rankStat" hidden><span class="stat-label">Rank</span><span class="stat-value rank-badge">😈</span></div>
         </div>
-        <button id="stopBtn" class="btn stop" title="Stop the current game and return to the menu">⏹ Stop</button>
+        <div class="hud-right">
+          <span class="player-name-badge" id="playerNameDisplay" hidden></span>
+          <button id="stopBtn" class="btn stop" title="Stop the current game and return to the menu">⏹ Stop</button>
+        </div>
       </div>
 
       <div class="timer-section">
@@ -101,6 +116,9 @@
       <div id="tooltip" class="hidden"></div>
       <button id="resetViewBtn" class="btn small">Reset View</button>
       <div id="mapLoading" class="map-loading">Loading map…</div>
+      <div id="countdownOverlay" class="countdown-overlay hidden">
+        <div id="countdownText" class="countdown-text">3</div>
+      </div>
     </div>
   </div>
 
@@ -108,6 +126,8 @@
   <div id="results" class="screen hidden">
     <div class="results-card">
       <h1>🏁 Game Complete!</h1>
+      <p class="results-player" id="finalPlayerName" hidden></p>
+      <p class="results-rank" id="finalRankBadge" hidden>🏆 Rank Mode</p>
       <div class="stats">
         <div class="stat"><span class="stat-label">Final Score</span><span class="stat-value" id="finalScore">0</span></div>
         <div class="stat"><span class="stat-label">Correct</span><span class="stat-value good" id="finalCorrect">0</span></div>
