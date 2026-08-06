@@ -13,7 +13,7 @@ Play it here: **https://PoppyCat1665.github.io/currency-game/**
 - Score tracking with detailed results
 
 ## Credits
-Made with 💙 by [PoppyCat1665](https://github.com/PoppyCat1665)
+Made with 💖 by [PoppyCat1665](https://github.com/PoppyCat1665)
 
 ## License
 Free to use for personal study.
