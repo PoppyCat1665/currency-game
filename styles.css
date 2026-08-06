@@ -208,6 +208,14 @@ input[type="number"] {
   opacity: 0.8;
 }
 
+.version {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Game screen ---------- */
 #game { flex-direction: column; padding: 14px 18px; gap: 0; }
 
