@@ -27,6 +27,45 @@ function shuffle(arr) {
   return a;
 }
 
+// ================= Cheat mode (dev only) =================
+// Secret keybind: hold Shift and press F → R → L in sequence.
+// Only works when the game is opened as a LOCAL FILE (file://) — never on the
+// hosted website. When enabled, the correct country is circled automatically
+// on every new question for easy development/testing.
+let cheatMode = false;
+let cheatKeys = "";           // tracks the F-R-L sequence while Shift is held
+let cheatLastKeyTime = 0;
+const isLocalFile = typeof location !== "undefined" && location.protocol === "file:";
+
+// Tiny toast notification that appears regardless of the current screen.
+function showToast(msg, isGood) {
+  const el = document.createElement("div");
+  el.textContent = msg;
+  el.style.cssText = "position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99999;background:" + (isGood ? "#14532d" : "#1e3a8a") + ";color:" + (isGood ? "#bbf7d0" : "#bfdbfe") + ";padding:8px 18px;border-radius:99px;font:700 14px/1.2 sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.4);pointer-events:none;";
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2400);
+}
+
+function toggleCheatMode() {
+  cheatMode = !cheatMode;
+  if (cheatMode) {
+    showToast("🛠 CHEAT MODE ON — correct country circled", true);
+    // Ring the current question right away.
+    if (game && game.phase === "question") ringCorrectForDev();
+  } else {
+    showToast("🛠 CHEAT MODE OFF", false);
+  }
+}
+
+// Draws the green ring + fill on the current question's correct country.
+function ringCorrectForDev() {
+  if (!game || !cheatMode) return;
+  const q = game.questions[game.index];
+  resetCountryClasses();
+  markCountries(q.countries, "correct");
+  markCircles(q.countries, "correct");
+}
+
 // ================= Sound FX (WebAudio, no external files) =================
 let audioCtx = null;
 let soundsEnabled = true;
@@ -87,6 +126,17 @@ function playSound(name) {
       break;
     case "click":
       playTone(520, 0, 0.07, "square", 0.06);
+      break;
+    case "streak":
+      playTone(784, 0, 0.1, "square", 0.15);   // G5
+      playTone(1046, 0.08, 0.12, "square", 0.15); // C6
+      playTone(1318, 0.16, 0.2, "square", 0.18);  // E6
+      break;
+    case "rankup":
+      playTone(523, 0, 0.12, "triangle", 0.16);  // C5
+      playTone(659, 0.1, 0.12, "triangle", 0.16); // E5
+      playTone(784, 0.2, 0.14, "triangle", 0.16); // G5
+      playTone(1046, 0.3, 0.3, "triangle", 0.2);  // C6
       break;
     case "finish":
       playTone(523, 0, 0.16, "sine", 0.2);      // C5
@@ -344,13 +394,14 @@ function debounce(fn, ms) {
 // ================= Map Interactions =================
 let game = null;
 
-// Every click — whether it lands directly on a country or on the ocean —
-// runs the radius-based resolution first. The circle (click radius around the
-// finger) takes priority over the exact country under the cursor, so if the
-// correct answer country is anywhere inside the radius it counts as correct.
-function onCountryClick(event) {
+// Clicking DIRECTLY on a country always counts as a hit on that EXACT country.
+// SVG hit-testing guarantees the clicked path is the country under the cursor,
+// so a correct country is correct and a wrong country is registered as wrong.
+// (Radius forgiveness applies only to OCEAN clicks — clicking water near the
+// answer — never to clicks on another country's land.)
+function onCountryClick(event, d) {
   if (game && game.phase === "question") {
-    resolveQuestionByRadius(event);
+    resolveQuestion(d.id);
   }
 }
 
@@ -398,18 +449,29 @@ function resolveQuestionByRadius(event) {
     }
   }
 
-  // Any country inside the radius counts as a hit, so if the correct answer is
-  // among the candidates, accept it (pick the nearest correct one). Otherwise
-  // fall back to the nearest country so a wrong guess is still marked.
-  if (nearest) {
+  // Only resolve if at least one country is actually WITHIN the click radius.
+  // If the correct answer is among the in-radius candidates, accept the
+  // nearest correct one. Otherwise fall back to the nearest in-radius country
+  // so a wrong guess is still marked. A pure ocean click beyond the radius is
+  // ignored completely — it never gets snapped to the nearest far-away country.
+  if (candidates.length > 0) {
     const q = game.questions[game.index];
     const correctSet = new Set(q.countries);
-    let chosenId = nearest.id;
+    let chosenId = null;
+    let nearestAnyKm = Infinity;
     let nearestCorrectKm = Infinity;
     for (let i = 0; i < candidates.length; i++) {
-      if (correctSet.has(candidates[i].id) && candidates[i].km < nearestCorrectKm) {
-        nearestCorrectKm = candidates[i].km;
-        chosenId = candidates[i].id;
+      const c = candidates[i];
+      if (c.km < nearestAnyKm) nearestAnyKm = c.km;
+      if (correctSet.has(c.id) && c.km < nearestCorrectKm) {
+        nearestCorrectKm = c.km;
+        chosenId = c.id;
+      }
+    }
+    // No correct country in range → use the nearest in-range country.
+    if (chosenId === null) {
+      for (let i = 0; i < candidates.length; i++) {
+        if (candidates[i].km === nearestAnyKm) { chosenId = candidates[i].id; break; }
       }
     }
     resolveQuestion(chosenId);
@@ -494,8 +556,57 @@ function hideFeedback() {
   fb.textContent = "";
 }
 
+let scoreAnimFrame = null;   // cancel any in-flight score tween
+
+// Update the HUD score. In ranked mode the number counts up smoothly from the
+// previous value; in casual mode it snaps instantly.
 function updateScoreDisplay() {
-  $("#score").textContent = game.score;
+  const el = $("#score");
+  const target = game.score;
+  if (!game.rankMode) {
+    el.textContent = target;
+    return;
+  }
+  const from = (typeof game.previousScore === "number") ? game.previousScore : 0;
+  const duration = 500; // ms
+  const start = performance.now();
+  if (scoreAnimFrame) cancelAnimationFrame(scoreAnimFrame);
+  const step = () => {
+    const t = Math.min(1, (performance.now() - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+    el.textContent = Math.round(from + (target - from) * eased);
+    if (t < 1) scoreAnimFrame = requestAnimationFrame(step);
+    else scoreAnimFrame = null;
+  };
+  step();
+}
+
+// Floating "+points" notification that pops up over the HUD.
+function showScorePop(text, kind) {
+  const pop = $("#scorePop");
+  pop.textContent = text;
+  pop.className = "score-pop " + (kind || "good-pop");
+  pop.classList.remove("hidden");
+  // restart the animation
+  pop.style.animation = "none";
+  void pop.offsetWidth;
+  pop.style.animation = "";
+  setTimeout(() => pop.classList.add("hidden"), 1100);
+}
+
+// Update the streak pill (e.g. "🔥 12 ×10" in ranked, "🔥 12" in casual).
+// The ×10 multiplier is ranked-only and is always kept in sync with the
+// current game mode, so it reliably shows whenever the pill updates.
+function updateStreakPill() {
+  const pill = $("#streakPill");
+  const count = $("#streakCount");
+  const mult = $("#streakMult");
+  count.textContent = game.streak || 0;
+  mult.classList.toggle("hidden", !game.rankMode);
+  pill.classList.remove("hidden");
+  pill.classList.remove("streak-bump");
+  void pill.offsetWidth;
+  pill.classList.add("streak-bump");
 }
 
 // ================= Timers =================
@@ -593,7 +704,48 @@ function startInterval(isFinal) {
 }
 
 // ================= Game Flow =================
+// Completely wipe the map/game screen so no stale data from the previous
+// round (highlighted countries, feedback, tooltip, badges, currency box,
+// stats) is visible when a fresh game starts.
+function resetGameScreen() {
+  // Stop any lingering overlay from a previous ranked countdown.
+  $("#countdownOverlay").classList.add("hidden");
+  $("#countdownText").textContent = "3";
+
+  // Clear answer markers and country highlight colors.
+  if (highlightG) highlightG.selectAll("g.hl").remove();
+  resetCountryClasses();
+
+  // Clear feedback and tooltip.
+  hideFeedback();
+  hideTooltip();
+
+  // Reset the currency display to placeholders.
+  $("#currencyBox").classList.remove("code-only");
+  $("#currencyName").textContent = "–";
+  $("#currencySymbol").textContent = "–";
+
+  // Reset the HUD stats.
+  $("#score").textContent = "0";
+  $("#guessesLeft").textContent = "1";
+  $("#guessesLeft").style.color = "var(--text)";
+  $("#progress").textContent = "1 / 42";
+  $("#totalTime").textContent = "0:00";
+
+  // Hide the optional player name + rank badges.
+  $("#playerNameDisplay").classList.add("hidden");
+  $("#rankStat").classList.add("hidden");
+
+  // Hide the interval section and reset the guess bar.
+  $("#intervalSection").classList.add("hidden");
+  $("#guessBar").classList.remove("low");
+  $("#guessBar").style.width = "100%";
+}
+
 function startGame() {
+  // Completely reset the map screen before anything from the previous game.
+  resetGameScreen();
+
   // stop any running timers
   stopTotalTimer();
   if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); clearTimer(game.countdownTimerId); }
@@ -608,23 +760,47 @@ function startGame() {
     ? Math.max(0, parseInt($("#intervalTimeInput").value, 10) || 3)
     : 0; // interval off -> skip straight to the next round
   const maxGuesses = rankMode ? 1 : Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
-  const snapRadiusKm = rankMode ? 10 : Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
+  const snapRadiusKm = rankMode ? 100 : Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
 
   // Read display & sound preferences for this session
   const showFullName = $("#showFullNameInput").checked;
   const showCountryNames = $("#showCountryNamesInput").checked;
   soundsEnabled = $("#soundInput").checked;
 
+  // 🐻 mode: ON = only the listed currencies (the classic study list).
+  // OFF = every currency in data.js is a playable target (currently covers
+  // all countries on the map with real currencies). Ranked forces 🐻 OFF.
+  const bearMode = rankMode ? false : $("#bearModeInput").checked;
+
   // Browsers block audio until a user gesture; Start click counts as one.
   ensureAudio();
 
-  const questions = shuffle(CURRENCIES.map(c => ({ ...c })));
+  // Build the question pool from the real currency data — every country on
+  // the map now has a real currency assigned, so both 🐻 on/off use the same
+  // full world list.
+  // Number of rounds: clamp to 1 .. number of available questions. The menu
+  // sets the default (46 in 🐻 mode, 40 in normal mode); max = total countries.
+  let questions = shuffle(CURRENCIES.map(c => ({ ...c })));
+  const roundsRequested = Math.max(1, parseInt($("#roundsInput").value, 10) || (bearMode ? 46 : 40));
+  const rounds = Math.min(roundsRequested, questions.length);
+  questions = questions.slice(0, rounds);
+
+  // Streak is tracked in every mode (casual + ranked); the extra ranked
+  // scoring stats below only apply in rank mode.
+  const previousScore = 0;
+  const streak = 0;
+  const highestStreak = 0;
+  const totalSpeedBonus = rankMode ? 0 : null;
+  const totalStreakBonus = rankMode ? 0 : null;
+  const fastestAnswer = rankMode ? Infinity : null;
+  const answerTimes = rankMode ? [] : null;
 
   game = {
     questions,
     total: questions.length,
     index: 0,
     score: 0,
+    previousScore,
     correct: 0,
     incorrect: 0,
     guessMs: guessSec * 1000,
@@ -634,7 +810,14 @@ function startGame() {
     showFullName,
     showCountryNames,
     rankMode,
+    bearMode,
     playerName,
+    streak,
+    highestStreak,
+    totalSpeedBonus,
+    totalStreakBonus,
+    fastestAnswer,
+    answerTimes,
     totalStart: performance.now(),
     totalTimerId: null,
     guessTimerId: null,
@@ -672,6 +855,13 @@ function startGame() {
   const rankStat = $("#rankStat");
   rankStat.classList.toggle("hidden", !rankMode);
   rankStat.classList.toggle("rankStat", rankMode);
+
+  // Streak pill: always visible, reset at the start of a game.
+  // The "×10" multiplier text only shows in ranked mode (casual = just number).
+  const streakPill = $("#streakPill");
+  streakPill.classList.remove("hidden");
+  $("#streakCount").textContent = "0";
+  $("#streakMult").classList.toggle("hidden", !rankMode);
 
   if (rankMode) {
     startRankCountdown();
@@ -750,8 +940,20 @@ function showQuestion() {
   resetCountryClasses();
   hideFeedback();
 
+  // Cheat mode (local only): auto-circle the correct country for dev.
+  if (cheatMode && isLocalFile) ringCorrectForDev();
+
   $("#guessBar").classList.remove("low");
   startGuessTimer();
+}
+
+// Streak bonus points per milestone (10, 20, 30, ...). Each additional
+// 10-streak block past 30 gives +500.
+function streakBonusFor(n) {
+  if (n < 10) return 0;
+  if (n < 20) return 100;
+  if (n < 30) return 250;
+  return 500;
 }
 
 function resolveQuestion(clickedId) {
@@ -762,6 +964,12 @@ function resolveQuestion(clickedId) {
   // ---------- Time's up: fail the question ----------
   if (clickedId === null) {
     game.incorrect++;
+    // Rank: streak resets, no points.
+    if (game.rankMode) {
+      game.streak = 0;
+      updateStreakPill();
+      $("#streakCount").textContent = 0;
+    }
     finishQuestion(q);
     showFeedback("info", `⏰ Time's up! ${q.name} is used in: ${answerLabelFor(q)}`);
     playSound("timeout");
@@ -769,14 +977,53 @@ function resolveQuestion(clickedId) {
     return;
   }
 
-  // ---------- Correct guess: score and advance ----------
+  // ---------- Correct guess ----------
   if (q.countries.includes(clickedId)) {
     game.correct++;
-    game.score++;
     const shown = nameOf(clickedId);
+
+    // Streak is tracked in EVERY mode (casual + ranked).
+    game.streak++;
+    if (game.streak > game.highestStreak) game.highestStreak = game.streak;
+    updateStreakPill();
+
+    if (game.rankMode) {
+      // Ranked scoring: +100, speed bonus = remaining ms * 10 per second.
+      const remainingMs = Math.max(0, game.guessDeadline - performance.now());
+      const remainingSec = remainingMs / 1000;
+      const speedBonus = Math.floor(remainingSec * 10);
+      const gained = 100 + speedBonus;
+
+      // Track answer time for fastest/average.
+      const answerMs = game.guessMs - remainingMs;
+      game.answerTimes.push(answerMs);
+      if (answerMs < game.fastestAnswer) game.fastestAnswer = answerMs;
+
+      // Streak milestone bonus (10/20/30...) — ranked only.
+      let streakBonus = 0;
+      if (game.streak % 10 === 0) {
+        streakBonus = streakBonusFor(game.streak);
+        game.totalStreakBonus += streakBonus;
+        playSound("streak");
+        showScorePop("🔥 " + game.streak + " STREAK! +" + streakBonus, "info-pop");
+      }
+
+      game.totalSpeedBonus += speedBonus;
+      game.previousScore = game.score;   // start point for the count-up animation
+      game.score += gained + streakBonus;
+
+      showScorePop("+" + (gained + streakBonus), "good-pop");
+      showFeedback("ok", `✅ Correct! ${q.name} → ${shown} (+${speedBonus} speed)`);
+      playSound("correct");
+    } else {
+      // Casual: +1 point per correct answer as before.
+      game.score++;
+      showScorePop("+1", "good-pop");
+      showFeedback("ok", `✅ Correct! ${q.name} → ${shown}`);
+      playSound("correct");
+    }
+
     finishQuestion(q);
-    showFeedback("ok", `✅ Correct! ${q.name} → ${shown}`);
-    playSound("correct");
     updateScoreDisplay();
     return;
   }
@@ -785,6 +1032,12 @@ function resolveQuestion(clickedId) {
   markCountries([clickedId], "wrong");
   markCircles([clickedId], "wrong");
   playSound("wrong");
+
+  if (game.rankMode) {
+    // Rank: a wrong guess resets the streak.
+    game.streak = 0;
+    $("#streakCount").textContent = 0;
+  }
 
   game.guessesLeft--;
   updateGuessesDisplay();
@@ -834,14 +1087,26 @@ function finishQuestion(q) {
   }
 }
 
+// Rank based on accuracy percentage (from the scoring doc).
+function rankForAccuracy(pct) {
+  if (pct >= 100) return "SS";
+  if (pct >= 98) return "S";
+  if (pct >= 95) return "A";
+  if (pct >= 90) return "B";
+  if (pct >= 80) return "C";
+  if (pct >= 70) return "D";
+  return "F";
+}
+
 // ================= Results =================
 function showResults() {
   game.phase = "done";
 
+  const accuracyPct = Math.round((game.correct / game.total) * 100);
   $("#finalScore").textContent = game.score;
   $("#finalCorrect").textContent = game.correct;
   $("#finalIncorrect").textContent = game.incorrect;
-  $("#finalAccuracy").textContent = Math.round((game.correct / game.total) * 100) + "%";
+  $("#finalAccuracy").textContent = accuracyPct + "%";
   $("#finalTime").textContent = formatTime(game.totalElapsed || 0);
   $("#finalAvg").textContent = ((game.totalElapsed || 0) / 1000 / game.total).toFixed(1) + "s";
   $("#finalRadius").textContent = game.snapRadiusKm + " km";
@@ -857,6 +1122,28 @@ function showResults() {
   const pRank = $("#finalRankBadge");
   pRank.classList.toggle("hidden", !game.rankMode);
 
+  // Highest streak is shown in EVERY mode (casual + ranked).
+  const streakStat = $("#streakStat");
+  $("#finalStreak").textContent = game.highestStreak || 0;
+  streakStat.classList.remove("hidden");
+
+  // Rank mode extra stats: rank box, fastest answer.
+  const rankBox = $("#rankScoreBox");
+  const fastestStat = $("#fastestStat");
+  if (game.rankMode) {
+    const rank = rankForAccuracy(accuracyPct);
+    $("#finalRank").textContent = rank;
+    $("#finalRankPoints").textContent = game.score + " pts";
+    rankBox.classList.remove("hidden");
+    playSound("rankup");
+
+    $("#finalFastest").textContent = ((game.fastestAnswer || 0) / 1000).toFixed(1) + "s";
+    fastestStat.classList.remove("hidden");
+  } else {
+    rankBox.classList.add("hidden");
+    fastestStat.classList.add("hidden");
+  }
+
   showScreen("results");
 }
 
@@ -868,9 +1155,114 @@ window.addEventListener("error", ev => {
   document.body.appendChild(div);
 });
 
+// ================= Rank mode menu toggle =================
+// When rank mode is switched ON the menu settings visibly change to the
+// forced hard values (5s, interval off, 1 guess, 10 km radius) and the whole
+// menu turns red. Switching OFF restores the user's previous inputs.
+const RANK_BODY_CLASS = "rank-active";
+
+function applyRankMenuState() {
+  const ranked = $("#rankModeInput").checked;
+  const guess = $("#guessTimeInput");
+  const intervalToggle = $("#intervalToggleInput");
+  const intervalTime = $("#intervalTimeInput");
+  const guesses = $("#maxGuessesInput");
+  const radius = $("#snapRadiusInput");
+  const roundsInput = $("#roundsInput");
+  const fullName = $("#showFullNameInput");
+  const countryNames = $("#showCountryNamesInput");
+  const bearMode = $("#bearModeInput");
+  const nameInput = $("#playerNameInput");
+
+  // Locked in rank mode: difficulty numbers/toggles + display toggles + 🐻.
+  const settingsToLock = [
+    "guessTimeInput",
+    "intervalToggleInput",
+    "intervalTimeInput",
+    "maxGuessesInput",
+    "snapRadiusInput",
+    "roundsInput",
+    "showFullNameInput",
+    "showCountryNamesInput",
+    "bearModeInput"
+  ];
+
+  if (ranked) {
+    // Store the user's casual values the first time they switch on, so we can
+    // restore them when rank mode is turned off.
+    if (guess.dataset.pref === undefined) {
+      guess.dataset.pref = guess.value;
+      guesses.dataset.pref = guesses.value;
+      radius.dataset.pref = radius.value;
+      intervalToggle.dataset.pref = intervalToggle.checked ? "1" : "0";
+      intervalTime.dataset.pref = intervalTime.value;
+      roundsInput.dataset.pref = roundsInput.value;
+      fullName.dataset.pref = fullName.checked ? "1" : "0";
+      countryNames.dataset.pref = countryNames.checked ? "1" : "0";
+      bearMode.dataset.pref = bearMode.checked ? "1" : "0";
+    }
+    // Force rank values.
+    guess.value = 5;
+    guesses.value = 1;
+    radius.value = 100;
+    roundsInput.value = 55;      // ranked always plays 55 rounds
+    intervalToggle.checked = false;
+    intervalTime.disabled = true;
+    intervalTime.value = 0;
+    fullName.checked = false;        // rank hides full currency names
+    countryNames.checked = true;     // rank always shows country names
+    bearMode.checked = false;        // 🐻 force off in ranked
+    nameInput.placeholder = "Your name… (shown in rank mode)";
+    // Lock every option input so the player can't change them mid-rank.
+    settingsToLock.forEach(id => {
+      const el = document.getElementById(id);
+      el.disabled = true;
+      el.classList.add("locked");
+    });
+  } else {
+    if (guess.dataset.pref !== undefined) {
+      guess.value = guess.dataset.pref;
+      guesses.value = guesses.dataset.pref;
+      radius.value = radius.dataset.pref;
+      intervalToggle.checked = intervalToggle.dataset.pref === "1";
+      intervalTime.disabled = false;
+      intervalTime.value = intervalTime.dataset.pref;
+      roundsInput.value = roundsInput.dataset.pref;
+      fullName.checked = fullName.dataset.pref === "1";
+      countryNames.checked = countryNames.dataset.pref === "1";
+      bearMode.checked = bearMode.dataset.pref === "1";
+    }
+    nameInput.placeholder = "Your name…";
+    // Re-enable every option input.
+    settingsToLock.forEach(id => {
+      const el = document.getElementById(id);
+      el.disabled = false;
+      el.classList.remove("locked");
+    });
+  }
+
+  document.body.classList.toggle(RANK_BODY_CLASS, ranked);
+}
+
 // ================= Wire up UI =================
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
+
+  // Initialize menu state from the rank toggle (off by default).
+  applyRankMenuState();
+  $("#rankModeInput").addEventListener("change", applyRankMenuState);
+
+  // Switching 🐻 mode adjusts the rounds default: 46 in 🐻, 40 in normal
+  // (only while not in ranked mode, which locks all settings anyway).
+  $("#bearModeInput").addEventListener("change", () => {
+    if (!$("#rankModeInput").checked) {
+      const roundsEl = $("#roundsInput");
+      if (roundsEl.dataset.pref === undefined) {
+        roundsEl.dataset.pref = roundsEl.value;
+      }
+      roundsEl.value = $("#bearModeInput").checked ? 46 : 40;
+    }
+  });
 
   $("#startBtn").addEventListener("click", startGame);
   $("#playAgainBtn").addEventListener("click", startGame);
@@ -910,4 +1302,24 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
     }
   }, true);
+
+  // Secret cheat keybind (Shift + F → R → L). Only works on LOCAL file://,
+  // never on the hosted website.
+  if (isLocalFile) {
+    window.addEventListener("keydown", e => {
+      if (!e.shiftKey) { cheatKeys = ""; return; }
+      const k = e.key.toLowerCase();
+      const now = Date.now();
+      // Reset if too much time between presses.
+      if (now - cheatLastKeyTime > 1500) cheatKeys = "";
+      cheatLastKeyTime = now;
+      cheatKeys += k;
+      if (!cheatKeys.startsWith("f")) { cheatKeys = k === "f" ? "f" : ""; }
+      if (cheatKeys === "frl") {
+        cheatKeys = "";
+        e.preventDefault();
+        toggleCheatMode();
+      }
+    });
+  }
 });

@@ -89,6 +89,37 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px 16px;
+  /* Button-like hover/press animation for every setting row. */
+  transition: background 0.25s ease, border-color 0.25s ease, transform 0.12s ease, box-shadow 0.25s ease;
+  cursor: pointer;
+}
+
+.setting:not(:has(input.locked)):hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(76, 201, 240, 0.15);
+}
+
+.setting:not(:has(input.locked)):active {
+  transform: scale(0.97);
+}
+
+/* Number inputs & text inputs inside settings get a tactile focus glow. */
+.setting input[type="number"],
+.setting input[type="text"],
+.setting.toggle input[type="checkbox"] {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease, background 0.25s ease;
+}
+
+.setting input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(76, 201, 240, 0.25);
+}
+
+.setting.toggle:active input[type="checkbox"] {
+  transform: scale(0.85);
 }
 
 .setting > span:first-child { flex: 1; font-weight: 600; }
@@ -178,6 +209,37 @@ input[type="number"] {
   width: 100%;
   font-size: 18px;
   box-shadow: 0 8px 24px rgba(76, 201, 240, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animated sheen that sweeps across the Start button. */
+.btn.primary::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: skewX(-20deg);
+  animation: btnSheen 3.2s ease-in-out infinite;
+}
+
+@keyframes btnSheen {
+  0%   { left: -80%; }
+  55%  { left: 130%; }
+  100% { left: 130%; }
+}
+
+.btn.primary:active {
+  transform: scale(0.96);
+}
+
+.btn:focus-visible,
+.rank-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .btn.small {
@@ -413,6 +475,109 @@ input[type="number"] {
   font-size: 15px;
 }
 
+/* ---------- Rank mode "evil red" theme ---------- */
+/* Applied to <body> when the rank toggle is on. Repaints the whole UI red. */
+
+/* Smooth fade between the blue and red themes. Added as transitions on every
+   element whose colors change with .rank-active. */
+body,
+.menu-card,
+.results-card,
+.setting,
+.currency-box,
+.stat,
+.map-wrapper,
+.toggle input[type="checkbox"],
+.toggle input[type="checkbox"]::after,
+.btn.primary,
+.sphere,
+.country {
+  transition: background 0.6s ease, border-color 0.6s ease, color 0.6s ease, box-shadow 0.6s ease, fill 0.6s ease, stroke 0.6s ease;
+}
+
+/* The timer-fill keeps its fast width animation but fades the color change. */
+.timer-fill {
+  transition: width 0.1s linear, background 0.6s ease;
+}
+
+body.rank-active {
+  background: radial-gradient(1200px 800px at 20% -10%, #3b0f1e 0%, #1a050d 45%, #0a0106 100%);
+}
+
+body.rank-active .screen {
+  /* menu card backdrop shifts red */
+}
+
+/* Locked (disabled) rank-mode settings */
+input.locked,
+.setting:has(input.locked),
+.setting.toggle:has(input.locked) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input[disabled].locked {
+  color: #d69a9a;
+}
+
+body.rank-active .menu-card,
+body.rank-active .results-card {
+  background: rgba(58, 12, 24, 0.85);
+  border-color: #7f1d1d;
+  box-shadow: 0 20px 60px rgba(127, 29, 29, 0.5);
+}
+
+body.rank-active .setting {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: #7f1d1d;
+}
+
+body.rank-active .btn.primary {
+  background: linear-gradient(135deg, #dc2626, #f87171);
+  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.45);
+}
+
+body.rank-active .toggle input[type="checkbox"]:checked {
+  background: rgba(248, 113, 113, 0.25);
+  border-color: #f87171;
+}
+
+body.rank-active .toggle input[type="checkbox"]:checked::after {
+  background: #f87171;
+}
+
+body.rank-active .currency-box {
+  background: linear-gradient(135deg, #3b0f1e, #4c1d2e);
+  border-color: #7f1d1d;
+}
+
+body.rank-active .timer-fill {
+  background: linear-gradient(90deg, #dc2626, #f87171);
+}
+
+body.rank-active .timer-fill.low { background: linear-gradient(90deg, #f87171, #fbbf24); }
+
+body.rank-active .stat {
+  border-color: #7f1d1d;
+}
+
+body.rank-active .map-wrapper {
+  border-color: #7f1d1d;
+  background: #1a050d;
+}
+
+body.rank-active .sphere { fill: #3b0f1e; stroke: #7f1d1d; }
+body.rank-active .country { fill: #7f1d1d; stroke: #2b0606; }
+body.rank-active .country:hover { fill: #b91c1c; }
+body.rank-active .country.correct { fill: #2dd4a7; }
+body.rank-active .country.wrong { fill: #f87171; }
+
+body.rank-active .subtitle,
+body.rank-active .hint { color: #d69a9a; }
+
+body.rank-active .version,
+body.rank-active .credit { color: #a06a6a; }
+
 /* ---------- Player name & rank in menu ---------- */
 .rank-setting { margin-bottom: 18px; }
 
@@ -559,6 +724,164 @@ input[type="number"] {
   letter-spacing: 1px;
   color: #f87171;
   text-shadow: 0 0 10px rgba(248, 113, 113, 0.6);
+}
+
+/* ---------- Screen transitions & entrance animations ---------- */
+/* Every screen fades + scales in when shown. */
+.screen {
+  animation: screenIn 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes screenIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* The menu card pops in on page load. */
+#menu .menu-card {
+  animation: cardIn 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(24px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Settings rows stagger in slightly. */
+#menu .setting,
+#menu .rank-setting,
+#menu .start-row,
+#menu .hint,
+#menu .credit,
+#menu .version {
+  animation: rowIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+#menu .setting:nth-child(1) { animation-delay: 0.05s; }
+#menu .setting:nth-child(2) { animation-delay: 0.1s; }
+#menu .setting:nth-child(3) { animation-delay: 0.15s; }
+#menu .setting:nth-child(4) { animation-delay: 0.2s; }
+#menu .setting:nth-child(5) { animation-delay: 0.25s; }
+#menu .setting:nth-child(6) { animation-delay: 0.3s; }
+#menu .setting:nth-child(7) { animation-delay: 0.35s; }
+#menu .setting:nth-child(8) { animation-delay: 0.4s; }
+#menu .rank-setting { animation-delay: 0.45s; }
+#menu .start-row   { animation-delay: 0.5s; }
+#menu .hint        { animation-delay: 0.55s; }
+#menu .credit      { animation-delay: 0.6s; }
+#menu .version     { animation-delay: 0.65s; }
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Rank toggle gives a little bounce glow when switched on. */
+.rank-toggle:has(input:checked) {
+  animation: rankToggleOn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes rankToggleOn {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+/* The results screen content animates in. */
+#results .results-card {
+  animation: cardIn 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Score popup notification ("+150", "🔥 x2!") */
+.score-pop {
+  position: absolute;
+  left: 50%;
+  top: 90px;
+  transform: translateX(-50%);
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  z-index: 30;
+  animation: scorePopUp 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  white-space: nowrap;
+}
+
+.score-pop.good-pop { color: #4ade80; }
+.score-pop.bad-pop  { color: #f87171; }
+.score-pop.info-pop { color: var(--accent); }
+
+@keyframes scorePopUp {
+  0%   { opacity: 0; transform: translate(-50%, 14px) scale(0.6); }
+  20%  { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -40px) scale(1); }
+}
+
+/* Streak pill in the HUD */
+.streak-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  border-radius: 99px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--warn);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.streak-pill.streak-bump {
+  animation: streakBump 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes streakBump {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.streak-flame { font-size: 15px; }
+
+/* Rank score box on the results screen */
+.rank-score {
+  margin: 16px auto 0;
+  padding: 14px 22px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.25), rgba(127, 29, 29, 0.45));
+  border: 2px solid #f87171;
+  box-shadow: 0 0 24px rgba(248, 113, 113, 0.35);
+  display: inline-block;
+  animation: rankScoreIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+@keyframes rankScoreIn {
+  from { opacity: 0; transform: scale(0.5) rotate(-6deg); }
+  to   { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+.rank-score-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #fca5a5;
+}
+
+.rank-score-value {
+  font-size: 56px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: #ffdada;
+  text-shadow: 0 0 24px rgba(248, 113, 113, 0.8);
+}
+
+.rank-score-sub {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fca5a5;
 }
 
 /* ---------- Results ---------- */
