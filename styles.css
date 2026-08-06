@@ -201,6 +201,13 @@ input[type="number"] {
 
 .hint { margin-top: 16px; color: var(--muted); font-size: 13px; }
 
+.credit {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 /* ---------- Game screen ---------- */
 #game { flex-direction: column; padding: 14px 18px; gap: 0; }
 
