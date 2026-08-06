@@ -367,23 +367,42 @@ function handleMapClick(event) {
 
   const radiusKm = (game.snapRadiusKm > 0) ? game.snapRadiusKm : 0;
 
-  let best = null;
-  let bestKm = Infinity;
+  // Collect every country whose boundary is within the radius, tracking each
+  // country's closest distance and the overall nearest one.
+  const candidates = [];   // { id, km }
+  let nearest = null;
+  let nearestKm = Infinity;
 
   for (let i = 0; i < countryFeatures.length; i++) {
     const pts = countryBoundaries[i];
     if (!pts || pts.length === 0) continue;
+    let minKm = Infinity;
     for (let j = 0; j < pts.length; j++) {
       const km = haversineKm(geo, pts[j]);
-      if (km <= radiusKm && km < bestKm) {
-        bestKm = km;
-        best = countryFeatures[i];
-      }
+      if (km < minKm) minKm = km;
+    }
+    if (minKm <= radiusKm) candidates.push({ id: countryFeatures[i].id, km: minKm });
+    if (minKm < nearestKm) {
+      nearestKm = minKm;
+      nearest = countryFeatures[i];
     }
   }
 
-  if (best) {
-    resolveQuestion(best.id);
+  // Any country inside the radius counts as a hit, so if the correct answer is
+  // among the candidates, accept it (pick the nearest correct one). Otherwise
+  // fall back to the nearest country so a wrong guess is still marked.
+  if (nearest) {
+    const q = game.questions[game.index];
+    const correctSet = new Set(q.countries);
+    let chosenId = nearest.id;
+    let nearestCorrectKm = Infinity;
+    for (let i = 0; i < candidates.length; i++) {
+      if (correctSet.has(candidates[i].id) && candidates[i].km < nearestCorrectKm) {
+        nearestCorrectKm = candidates[i].km;
+        chosenId = candidates[i].id;
+      }
+    }
+    resolveQuestion(chosenId);
   }
   // Far from any country (pure ocean click) — ignore completely, don't count a guess.
 }
