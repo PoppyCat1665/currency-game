@@ -580,7 +580,7 @@ function startGame() {
   const guessSec = Math.max(1, parseInt($("#guessTimeInput").value, 10) || 7);
   const intervalSec = Math.max(0, parseInt($("#intervalTimeInput").value, 10) || 3);
   const maxGuesses = Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
-  const snapRadiusKm = Math.max(0, parseFloat($("#snapRadiusInput").value) || 150);
+  const snapRadiusKm = Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
 
   // Read display & sound preferences for this session
   const showFullName = $("#showFullNameInput").checked;
