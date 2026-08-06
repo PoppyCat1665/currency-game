@@ -533,6 +533,25 @@ function stopGuessTimer() {
   clearTimer(game.guessTimerId);
 }
 
+// Advance to the next question (or results) immediately, ending the interval.
+function advanceInterval(isFinal) {
+  clearTimer(game.intervalTimerId);
+  $("#intervalSection").classList.add("hidden");
+  if (isFinal) {
+    showResults();
+  } else {
+    game.index++;
+    showQuestion();
+  }
+}
+
+// Clicking anywhere during the interval wait skips the remaining wait time.
+function skipInterval() {
+  if (!game || game.phase !== "answered") return;
+  const isFinal = game.index === game.total - 1;
+  advanceInterval(isFinal);
+}
+
 function startInterval(isFinal) {
   clearTimer(game.intervalTimerId);
   $("#intervalSection").classList.remove("hidden");
@@ -544,14 +563,7 @@ function startInterval(isFinal) {
   const tick = () => {
     const remain = deadline - performance.now();
     if (remain <= 0) {
-      clearTimer(game.intervalTimerId);
-      $("#intervalSection").classList.add("hidden");
-      if (isFinal) {
-        showResults();
-      } else {
-        game.index++;
-        showQuestion();
-      }
+      advanceInterval(isFinal);
       return;
     }
     $("#intervalLeft").textContent = (remain / 1000).toFixed(1) + "s";
@@ -559,9 +571,7 @@ function startInterval(isFinal) {
   };
 
   if (dur <= 0) {
-    $("#intervalSection").classList.add("hidden");
-    if (isFinal) { showResults(); }
-    else { game.index++; showQuestion(); }
+    advanceInterval(isFinal);
     return;
   }
 
@@ -792,5 +802,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (zoomBehavior && svg) {
       svg.transition().duration(300).call(zoomBehavior.transform, d3.zoomIdentity);
     }
+  });
+
+  // Click anywhere on the game screen during the interval wait to skip it.
+  // Button clicks (Stop, Reset View, etc.) are ignored so they still work.
+  $("game").addEventListener("click", e => {
+    if (e.target.closest("button")) return;
+    skipInterval();
   });
 });
