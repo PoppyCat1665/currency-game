@@ -4,79 +4,141 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Currency Guessing Game</title>
-  <link rel="stylesheet" href="styles.css?v=20">
+  <link rel="stylesheet" href="styles.css?v=21">
 </head>
 <body>
 
   <!-- ========== MAIN MENU ========== -->
   <div id="menu" class="screen">
     <div class="menu-card">
-      <h1>🌍 Currency Guessing Game</h1>
+      <h1>🌍 Currency Guessing</h1>
       <p class="subtitle">A fast study tool to memorize currencies and their countries before your exam.</p>
 
-      <div class="settings">
-        <label class="setting">
-          <span>Guess Time</span>
-          <input id="guessTimeInput" type="number" min="1" max="120" step="1" value="7">
-          <span class="unit">seconds</span>
-        </label>
-        <label class="setting toggle">
-          <span>Interval Wait</span>
-          <input id="intervalToggleInput" type="checkbox" checked>
-        </label>
-        <label class="setting">
-          <span>Interval Time</span>
-          <input id="intervalTimeInput" type="number" min="0" max="60" step="1" value="3">
-          <span class="unit">seconds</span>
-        </label>
-        <label class="setting">
-          <span>Max Guesses</span>
-          <input id="maxGuessesInput" type="number" min="1" max="10" step="1" value="1">
-          <span class="unit">per question</span>
-        </label>
-        <label class="setting">
-          <span>Click Radius</span>
-          <input id="snapRadiusInput" type="number" min="0" max="1000" step="10" value="1000">
-          <span class="unit">km nearby area</span>
-        </label>
-        <label class="setting">
-          <span>Rounds</span>
-          <input id="roundsInput" type="number" min="1" max="235" step="1" value="40">
-          <span class="unit">questions</span>
-        </label>
-        <label class="setting toggle">
-          <span>Show Full Currency Name</span>
-          <input id="showFullNameInput" type="checkbox" checked>
-        </label>
-        <label class="setting toggle">
-          <span>Show Country Names on Map</span>
-          <input id="showCountryNamesInput" type="checkbox" checked>
-        </label>
-        <label class="setting toggle">
-          <span>Sound Effects</span>
-          <input id="soundInput" type="checkbox" checked>
-        </label>
-        <label class="setting toggle" title="ON: use only the classic exam list. OFF: every country on the map is a playable target (listed + unlisted). Works in both casual and ranked.">
-          <span>📚 Exam Mode</span>
-          <input id="examModeInput" type="checkbox">
-        </label>
+      <!-- Hidden input drives rank mode. Set by the PLAY / RANKED buttons. -->
+      <input id="rankModeInput" type="checkbox" class="hidden">
+
+      <div class="mode-buttons">
+        <button id="playBtn" class="btn primary mode-btn">▶ &nbsp;PLAY</button>
+        <button id="rankedBtn" class="btn ranked mode-btn">😈 &nbsp;RANKED</button>
       </div>
 
-      <label class="setting rank-setting">
-        <span>Player Name (optional)</span>
-        <input id="playerNameInput" type="text" maxlength="20" placeholder="Your name…">
-      </label>
+      <button id="settingsBtn" class="btn ghost">⚙ &nbsp;SETTINGS</button>
 
-      <div class="start-row">
-        <button id="startBtn" class="btn primary">Start Game</button>
-        <label class="rank-toggle" title="Hard mode: 5s per question, 1 guess, 250 km click radius, no interval breaks">
-          <input id="rankModeInput" type="checkbox">
-          <span class="rank-label">😈 RANK</span>
-        </label>
-      </div>
       <p class="hint">You'll be shown a currency – click the country that uses it before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v2.2</p>
+      <p class="version" id="appVersion">v3.0</p>
+    </div>
+  </div>
+
+  <!-- ========== SETTINGS (categorized overlay) ========== -->
+  <div id="settingsOverlay" class="settings-overlay hidden">
+    <div class="settings-panel">
+      <div class="settings-header">
+        <h2>⚙ Settings</h2>
+        <button id="settingsCloseBtn" class="btn icon" aria-label="Close settings">✕</button>
+      </div>
+
+      <div class="settings-body">
+        <nav class="settings-nav" id="settingsNav">
+          <button class="cat-btn active" data-cat="gameplay">Gameplay</button>
+          <button class="cat-btn" data-cat="display">Display</button>
+          <button class="cat-btn" data-cat="map">Map</button>
+          <button class="cat-btn" data-cat="audio">Audio</button>
+          <button class="cat-btn" data-cat="study">Study</button>
+          <button class="cat-btn" data-cat="player">Player</button>
+          <button class="cat-btn" data-cat="other">Other</button>
+        </nav>
+
+        <div class="settings-content">
+
+          <section class="cat-section active" data-section="gameplay">
+            <h3>Gameplay</h3>
+            <label class="setting">
+              <span>Guess Time</span>
+              <input id="guessTimeInput" type="number" min="1" max="30" step="1" value="7">
+              <span class="unit">seconds</span>
+            </label>
+            <label class="setting toggle">
+              <span>Interval Wait</span>
+              <input id="intervalToggleInput" type="checkbox" checked>
+            </label>
+            <label class="setting">
+              <span>Interval Time</span>
+              <input id="intervalTimeInput" type="number" min="0" max="10" step="1" value="3">
+              <span class="unit">seconds</span>
+            </label>
+            <label class="setting">
+              <span>Max Guesses</span>
+              <input id="maxGuessesInput" type="number" min="1" max="10" step="1" value="1">
+              <span class="unit">per question</span>
+            </label>
+            <label class="setting">
+              <span>Rounds</span>
+              <input id="roundsInput" type="number" min="1" max="235" step="1" value="40">
+              <span class="unit">questions</span>
+            </label>
+          </section>
+
+          <section class="cat-section" data-section="display">
+            <h3>Display</h3>
+            <label class="setting toggle">
+              <span>Show Full Currency Name</span>
+              <input id="showFullNameInput" type="checkbox" checked>
+            </label>
+            <label class="setting toggle">
+              <span>Show Country Names on Map</span>
+              <input id="showCountryNamesInput" type="checkbox" checked>
+            </label>
+          </section>
+
+          <section class="cat-section" data-section="map">
+            <h3>Map</h3>
+            <label class="setting">
+              <span>Click Radius</span>
+              <input id="snapRadiusInput" type="number" min="0" max="1000" step="10" value="1000">
+              <span class="unit">km</span>
+            </label>
+            <p class="setting-note">Larger values make country selection more forgiving when tapping near a country.</p>
+          </section>
+
+          <section class="cat-section" data-section="audio">
+            <h3>Audio</h3>
+            <label class="setting toggle">
+              <span>Sound Effects</span>
+              <input id="soundInput" type="checkbox" checked>
+            </label>
+          </section>
+
+          <section class="cat-section" data-section="study">
+            <h3>Study</h3>
+            <label class="setting toggle" title="ON: use only the classic exam list.">
+              <span>📚 Exam Mode</span>
+              <input id="examModeInput" type="checkbox">
+            </label>
+            <p class="setting-note">Practice under conditions similar to your test, using only the classic study list.</p>
+          </section>
+
+          <section class="cat-section" data-section="player">
+            <h3>Player</h3>
+            <label class="setting rank-setting">
+              <span>Player Name</span>
+              <input id="playerNameInput" type="text" maxlength="20" placeholder="Player">
+            </label>
+            <p class="setting-note">Optional. Shown on results screens and in ranked play.</p>
+          </section>
+
+          <section class="cat-section" data-section="other">
+            <h3>Other</h3>
+            <p class="setting-note">More options coming soon.</p>
+          </section>
+
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button id="resetBtn" class="btn danger">Reset to Defaults</button>
+        <button id="settingsDoneBtn" class="btn primary">Close</button>
+      </div>
     </div>
   </div>
 
@@ -166,10 +228,10 @@
     </div>
   </div>
 
-  <script src="lib/d3.min.js?v=20"></script>
-  <script src="lib/topojson.min.js?v=20"></script>
-  <script src="lib/world.js?v=20"></script>
-  <script src="data.js?v=20"></script>
-  <script src="game.js?v=20"></script>
+  <script src="lib/d3.min.js?v=21"></script>
+  <script src="lib/topojson.min.js?v=21"></script>
+  <script src="lib/world.js?v=21"></script>
+  <script src="data.js?v=21"></script>
+  <script src="game.js?v=21"></script>
 </body>
 </html>

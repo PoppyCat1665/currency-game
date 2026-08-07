@@ -897,3 +897,163 @@ body.rank-active .credit { color: #a06a6a; }
 
 .results-buttons { display: flex; gap: 12px; }
 .results-buttons .btn { flex: 1; }
+
+/* ================= New menu: mode buttons ================= */
+.mode-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 24px 0;
+}
+
+.mode-btn {
+  width: 100%;
+  padding: 18px 24px;
+  font-size: 20px;
+  letter-spacing: 1.5px;
+  text-align: center;
+}
+
+.btn.ranked {
+  background: linear-gradient(135deg, #dc2626, #f87171);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.4);
+}
+.btn.ranked:hover { filter: brightness(1.12); }
+
+.btn.ghost {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 16px;
+}
+.btn.ghost:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--accent); }
+
+.btn.icon {
+  padding: 8px 12px;
+  font-size: 15px;
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.btn.danger {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  color: #fca5a5;
+}
+.btn.danger:hover { background: rgba(248, 113, 113, 0.25); color: #fff; }
+
+/* ================= Settings overlay ================= */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(3, 7, 18, 0.6);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.settings-overlay.open { opacity: 1; }
+
+.settings-panel {
+  width: 100%;
+  max-width: 720px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+  transform: translateY(20px) scale(0.98);
+  transition: transform 0.2s ease;
+  overflow: hidden;
+}
+.settings-overlay.open .settings-panel { transform: translateY(0) scale(1); }
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-header h2 { font-size: 18px; letter-spacing: 1px; }
+
+.settings-body { display: flex; flex: 1; min-height: 0; }
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 170px;
+  flex-shrink: 0;
+  padding: 14px 10px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.cat-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.cat-btn:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.cat-btn.active { background: rgba(76, 201, 240, 0.14); color: var(--accent); }
+
+.settings-content { flex: 1; padding: 18px 22px; overflow-y: auto; }
+
+.cat-section { display: none; }
+.cat-section.active { display: flex; flex-direction: column; gap: 12px; animation: catIn 0.2s ease; }
+@keyframes catIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.cat-section h3 {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.setting-note { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+.settings-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+.settings-footer .btn { flex: 1; }
+
+/* Responsive: settings nav becomes tabs on smaller screens */
+@media (max-width: 640px) {
+  .settings-body { flex-direction: column; }
+  .settings-nav {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 10px;
+    gap: 6px;
+    overflow-x: auto;
+  }
+  .cat-btn { text-align: center; padding: 8px 12px; white-space: nowrap; }
+}

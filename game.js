@@ -1265,6 +1265,72 @@ function applyRankMenuState() {
 
   document.body.classList.toggle(RANK_BODY_CLASS, ranked);
   syncRoundsMax();
+  syncIntervalState();
+}
+
+// ================= Settings overlay (categorized) =================
+// Interval Time is visually disabled whenever Interval Wait is off.
+function syncIntervalState() {
+  const on = $("#intervalToggleInput").checked;
+  const t = $("#intervalTimeInput");
+  t.disabled = !on;
+  t.classList.toggle("locked", !on);
+}
+
+// Show only the selected category's settings section + highlight its nav item.
+function selectCategory(name) {
+  document.querySelectorAll(".cat-section").forEach(s => {
+    s.classList.toggle("active", s.dataset.section === name);
+  });
+  document.querySelectorAll(".cat-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.cat === name);
+  });
+}
+
+function openSettings() {
+  selectCategory("gameplay");
+  applyRankMenuState();            // ensure inputs reflect the current (non-rank) menu state
+  syncIntervalState();
+  const ov = $("#settingsOverlay");
+  ov.classList.remove("hidden");
+  void ov.offsetWidth;             // force reflow so the open transition plays
+  ov.classList.add("open");
+}
+
+function closeSettings() {
+  const ov = $("#settingsOverlay");
+  ov.classList.remove("open");
+  setTimeout(() => ov.classList.add("hidden"), 220);
+}
+
+// Restore every configurable setting to the game's defaults.
+function resetDefaults() {
+  $("#guessTimeInput").value = 7;
+  $("#intervalToggleInput").checked = true;
+  $("#intervalTimeInput").value = 3;
+  $("#maxGuessesInput").value = 1;
+  $("#snapRadiusInput").value = 1000;
+  $("#roundsInput").value = 40;
+  $("#showFullNameInput").checked = true;
+  $("#showCountryNamesInput").checked = true;
+  $("#soundInput").checked = true;
+  $("#examModeInput").checked = false;
+  $("#playerNameInput").value = "";
+  syncRoundsMax();
+  syncIntervalState();
+}
+
+// Return to the main menu, always in the normal (non-rank) state.
+function goToMenu() {
+  if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); clearTimer(game.countdownTimerId); }
+  stopTotalTimer();
+  $("#countdownOverlay").classList.add("hidden");
+  if (zoomBehavior && svg) {
+    svg.call(zoomBehavior.transform, d3.zoomIdentity);
+  }
+  $("#rankModeInput").checked = false;
+  applyRankMenuState();
+  showScreen("menu");
 }
 
 // ================= Wire up UI =================
@@ -1274,7 +1340,37 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize menu state from the rank toggle (off by default).
   applyRankMenuState();
   syncRoundsMax();
+  syncIntervalState();
   $("#rankModeInput").addEventListener("change", applyRankMenuState);
+
+  // Mode buttons: PLAY = casual, RANKED = rank mode.
+  $("#playBtn").addEventListener("click", () => {
+    $("#rankModeInput").checked = false;
+    applyRankMenuState();
+    startGame();
+  });
+  $("#rankedBtn").addEventListener("click", () => {
+    $("#rankModeInput").checked = true;
+    applyRankMenuState();
+    startGame();
+  });
+
+  // Settings overlay open/close/navigation.
+  $("#settingsBtn").addEventListener("click", openSettings);
+  $("#settingsCloseBtn").addEventListener("click", closeSettings);
+  $("#settingsDoneBtn").addEventListener("click", closeSettings);
+  $("#resetBtn").addEventListener("click", resetDefaults);
+  document.querySelectorAll(".cat-btn").forEach(btn => {
+    btn.addEventListener("click", () => selectCategory(btn.dataset.cat));
+  });
+  $("#settingsOverlay").addEventListener("click", e => {
+    if (e.target === $("#settingsOverlay")) closeSettings();   // click backdrop
+  });
+  window.addEventListener("keydown", e => {
+    if (e.key === "Escape" && !$("#settingsOverlay").classList.contains("hidden")) closeSettings();
+  });
+  // Interval Wait off => Interval Time disabled.
+  $("#intervalToggleInput").addEventListener("change", syncIntervalState);
 
   // Switching 📚 Exam mode adjusts the rounds default and max: EXAM_COUNT in
   // 📚 mode, 40 default / FULL_COUNT max in casual. In ranked play (exam stays
@@ -1291,26 +1387,9 @@ document.addEventListener("DOMContentLoaded", () => {
     syncRoundsMax();
   });
 
-  $("#startBtn").addEventListener("click", startGame);
   $("#playAgainBtn").addEventListener("click", startGame);
-  $("#stopBtn").addEventListener("click", () => {
-    if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); clearTimer(game.countdownTimerId); }
-    stopTotalTimer();
-    $("#countdownOverlay").classList.add("hidden");
-    if (zoomBehavior && svg) {
-      svg.call(zoomBehavior.transform, d3.zoomIdentity);
-    }
-    showScreen("menu");
-  });
-  $("#mainMenuBtn").addEventListener("click", () => {
-    if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); clearTimer(game.countdownTimerId); }
-    stopTotalTimer();
-    $("#countdownOverlay").classList.add("hidden");
-    if (zoomBehavior && svg) {
-      svg.call(zoomBehavior.transform, d3.zoomIdentity);
-    }
-    showScreen("menu");
-  });
+  $("#stopBtn").addEventListener("click", goToMenu);
+  $("#mainMenuBtn").addEventListener("click", goToMenu);
   $("#resetViewBtn").addEventListener("click", () => {
     if (zoomBehavior && svg) {
       svg.transition().duration(300).call(zoomBehavior.transform, d3.zoomIdentity);
