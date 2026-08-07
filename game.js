@@ -1348,7 +1348,13 @@ function closeOverlay(id) {
 let pendingRankRounds = 50;        // default rank mode
 
 function openRankPicker() {
-  const poolTotal = $("#examModeInput").checked ? EXAM_COUNT : FULL_COUNT;
+  // With Exam mode on, there's no rank-size choice: play the full exam list
+  // (EXAM_COUNT rounds) directly, without showing the picker.
+  if ($("#examModeInput").checked) {
+    startRankMode("all");
+    return;
+  }
+  const poolTotal = FULL_COUNT;
   $("#rankAllCount").textContent = poolTotal;
   openOverlay("rankPicker");
 }
