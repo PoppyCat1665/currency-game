@@ -437,17 +437,30 @@ function resolveQuestionByRadius(event) {
   let nearestKm = Infinity;
 
   for (let i = 0; i < countryFeatures.length; i++) {
+    const f = countryFeatures[i];
     const pts = countryBoundaries[i];
     if (!pts || pts.length === 0) continue;
+
     let minKm = Infinity;
-    for (let j = 0; j < pts.length; j++) {
-      const km = haversineKm(geo, pts[j]);
-      if (km < minKm) minKm = km;
+
+    // 1) Clicking INSIDE a country's territory counts as a direct hit. This
+    //    matters for large countries (Russia, China, USA...) whose interiors
+    //    are far from any border point, so the border-radius test alone would
+    //    miss them.
+    if (d3.geoContains(f, geo)) {
+      minKm = 0;
+    } else {
+      // 2) Otherwise use distance to the country's border (nearby forgiveness).
+      for (let j = 0; j < pts.length; j++) {
+        const km = haversineKm(geo, pts[j]);
+        if (km < minKm) minKm = km;
+      }
     }
-    if (minKm <= radiusKm) candidates.push({ id: countryFeatures[i].id, km: minKm });
+
+    if (minKm <= radiusKm) candidates.push({ id: f.id, km: minKm });
     if (minKm < nearestKm) {
       nearestKm = minKm;
-      nearest = countryFeatures[i];
+      nearest = f;
     }
   }
 
