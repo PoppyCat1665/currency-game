@@ -1680,6 +1680,66 @@ function startRankMode(rounds) {
 }
 
 // Restore every configurable setting to the game's defaults.
+// Default value per setting id (string/number for value inputs, boolean for
+// checkboxes). Used by the per-setting reset buttons.
+const SETTING_DEFAULTS = {
+  guessTimeInput: "7",
+  intervalToggleInput: true,
+  intervalTimeInput: "3",
+  maxGuessesInput: "1",
+  snapRadiusInput: "1000",
+  roundsInput: "40",
+  showFullNameInput: true,
+  showCountryNamesInput: true,
+  tapSelectInput: true,
+  pulseToggleInput: true,
+  soundInput: true,
+  examModeInput: false,
+  themeNormalInput: "#4cc9f0",
+  themeRankInput: "#ef4444",
+  playerNameInput: ""
+};
+
+// Refresh anything that depends on a setting after it changes.
+function afterSettingChange(id) {
+  if (id === "intervalToggleInput" || id === "intervalTimeInput") syncIntervalState();
+  if (id === "examModeInput") { syncCountriesState(); syncRoundsMax(); }
+  if (id === "roundsInput") syncRoundsMax();
+  if (id === "themeNormalInput" || id === "themeRankInput") applyTheme();
+  if (id === "pulseToggleInput") setPulse($("#pulseToggleInput").checked);
+  saveSettings();
+}
+
+// Reset a single setting to its default value.
+function resetOneSetting(id) {
+  if (!(id in SETTING_DEFAULTS)) return;
+  const d = SETTING_DEFAULTS[id];
+  const el = $("#" + id);
+  if (typeof d === "boolean") el.checked = d;
+  else el.value = d;
+  afterSettingChange(id);
+}
+
+// Add a small ↺ reset button to every setting row that has a known default.
+function addPerSettingReset() {
+  document.querySelectorAll(".setting").forEach(row => {
+    const input = row.querySelector("input");
+    if (!input || !input.id || !(input.id in SETTING_DEFAULTS)) return;
+    if (row.querySelector(".setting-reset")) return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "setting-reset";
+    btn.title = "Reset to default";
+    btn.setAttribute("aria-label", "Reset to default");
+    btn.textContent = "↺";
+    btn.addEventListener("click", e => {
+      e.preventDefault();          // don't toggle a parent label's checkbox
+      resetOneSetting(input.id);
+    });
+    row.appendChild(btn);
+  });
+}
+
 function resetDefaults() {
   $("#guessTimeInput").value = 7;
   $("#intervalToggleInput").checked = true;
@@ -1981,6 +2041,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
   initSelectedCountries();
   renderCountryList();
+  addPerSettingReset();
   applyTheme();                    // apply chosen Normal/Rank colors
   setPulse($("#pulseToggleInput").checked);
   applyRankMenuState();

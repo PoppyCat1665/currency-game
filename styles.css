@@ -572,6 +572,26 @@ body.no-pulse .hl circle { animation: none; }
   flex-shrink: 0;
 }
 
+/* Per-setting "reset to default" button. */
+.setting-reset {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.setting-reset:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
 /* Click-catching layer that sits underneath the countries (ocean clicks). */
 .ocean { pointer-events: all; fill: transparent; cursor: pointer; }
 
