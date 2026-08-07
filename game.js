@@ -397,11 +397,13 @@ let game = null;
 // Clicking DIRECTLY on a country always counts as a hit on that EXACT country.
 // SVG hit-testing guarantees the clicked path is the country under the cursor,
 // so a correct country is correct and a wrong country is registered as wrong.
-// (Radius forgiveness applies only to OCEAN clicks — clicking water near the
-// answer — never to clicks on another country's land.)
-function onCountryClick(event, d) {
+// Every click — whether it lands on the ocean or directly on a country — runs
+// the radius-based resolution, so the click radius (in km) applies even when
+// the user misclicks a wrong nearby country. If the correct answer country is
+// anywhere inside the radius of the click point, it counts as correct.
+function onCountryClick(event) {
   if (game && game.phase === "question") {
-    resolveQuestion(d.id);
+    resolveQuestionByRadius(event);
   }
 }
 
