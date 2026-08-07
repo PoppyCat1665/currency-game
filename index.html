@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Currency Guessing Game</title>
-  <link rel="stylesheet" href="styles.css?v=38">
+  <link rel="stylesheet" href="styles.css?v=39">
 </head>
 <body>
 
@@ -36,7 +36,7 @@
 
       <p class="hint">You'll be shown a currency – click the country that uses it before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v3.14c</p>
+      <p class="version" id="appVersion">v3.14d</p>
     </div>
   </div>
 
@@ -118,6 +118,11 @@
               <span class="unit">km</span>
             </label>
             <p class="setting-note">Larger values make country selection more forgiving when tapping near a country.</p>
+            <label class="setting toggle">
+              <span>Pen / Touch Tap Select</span>
+              <input id="tapSelectInput" type="checkbox" checked>
+            </label>
+            <p class="setting-note">ON: tap or Apple Pencil selects the country. OFF (camera mode): pen/touch only moves the map — drag to look around.</p>
           </section>
 
           <section class="cat-section" data-section="audio">
@@ -292,11 +297,11 @@
     </div>
   </div>
 
-  <script src="lib/d3.min.js?v=38"></script>
-  <script src="lib/topojson.min.js?v=38"></script>
-  <script src="lib/world.js?v=38"></script>
-  <script src="continents.js?v=38"></script>
-  <script src="data.js?v=38"></script>
-  <script src="game.js?v=38"></script>
+  <script src="lib/d3.min.js?v=39"></script>
+  <script src="lib/topojson.min.js?v=39"></script>
+  <script src="lib/world.js?v=39"></script>
+  <script src="continents.js?v=39"></script>
+  <script src="data.js?v=39"></script>
+  <script src="game.js?v=39"></script>
 </body>
 </html>

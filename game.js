@@ -219,6 +219,30 @@ function initMap() {
   // Reference for diagnostics/testing; harmless.
   svg.node().__zoomBehavior = zoomBehavior;
 
+  // Pen / touch tap detection. d3-zoom's drag handling can swallow taps from
+  // an Apple Pencil or finger, making it pan instead of selecting. We detect a
+  // quick, non-dragging pointer lift and resolve it as a country selection.
+  // Mouse still uses the normal click handlers below.
+  let tapState = null;
+  svg.on("pointerdown", ev => {
+    if (ev.pointerType === "mouse") { tapState = null; return; }
+    tapState = { x: ev.clientX, y: ev.clientY, t: performance.now(), moved: false };
+  });
+  svg.on("pointermove", ev => {
+    if (!tapState) return;
+    if (Math.hypot(ev.clientX - tapState.x, ev.clientY - tapState.y) > 8) tapState.moved = true;
+  });
+  svg.on("pointerup", ev => {
+    if (!tapState) return;
+    const s = tapState;
+    tapState = null;
+    const isTap = !s.moved && (performance.now() - s.t) < 500;
+    if (isTap && game && game.phase === "question" && game.tapSelect) {
+      resolveQuestionByRadius(ev);
+    }
+  });
+  svg.on("pointercancel", () => { tapState = null; });
+
   mapG = svg.append("g");
 
   // Ocean click-catcher under the countries: catches clicks near tiny nations.
@@ -812,6 +836,7 @@ function startGame() {
   // Read display & sound preferences for this session
   const showFullName = $("#showFullNameInput").checked;
   const showCountryNames = $("#showCountryNamesInput").checked;
+  const tapSelect = $("#tapSelectInput").checked;
   soundsEnabled = $("#soundInput").checked;
 
   // 📚 Exam mode: ON = only the classic study list.
@@ -873,6 +898,7 @@ function startGame() {
     snapRadiusKm,
     showFullName,
     showCountryNames,
+    tapSelect,
     rankMode,
     examMode,
     playerName,
@@ -1371,6 +1397,7 @@ function saveSettings() {
       rounds: $("#roundsInput").value,
       showFullName: $("#showFullNameInput").checked,
       showCountryNames: $("#showCountryNamesInput").checked,
+      tapSelect: $("#tapSelectInput").checked,
       sound: $("#soundInput").checked,
       examMode: $("#examModeInput").checked,
       playerName: $("#playerNameInput").value,
@@ -1393,6 +1420,7 @@ function loadSettings() {
     if (d.rounds !== undefined) $("#roundsInput").value = d.rounds;
     if (d.showFullName !== undefined) $("#showFullNameInput").checked = !!d.showFullName;
     if (d.showCountryNames !== undefined) $("#showCountryNamesInput").checked = !!d.showCountryNames;
+    if (d.tapSelect !== undefined) $("#tapSelectInput").checked = !!d.tapSelect;
     if (d.sound !== undefined) $("#soundInput").checked = !!d.sound;
     if (d.examMode !== undefined) $("#examModeInput").checked = !!d.examMode;
     if (d.playerName !== undefined) $("#playerNameInput").value = d.playerName;
@@ -1797,7 +1825,7 @@ document.addEventListener("DOMContentLoaded", () => {
   [
     "guessTimeInput", "intervalToggleInput", "intervalTimeInput",
     "maxGuessesInput", "snapRadiusInput", "roundsInput",
-    "showFullNameInput", "showCountryNamesInput", "soundInput",
+    "showFullNameInput", "showCountryNamesInput", "tapSelectInput", "soundInput",
     "examModeInput", "playerNameInput"
   ].forEach(id => {
     const el = $(id);
