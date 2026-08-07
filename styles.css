@@ -2,13 +2,48 @@
   --bg1: #0b132b;
   --bg2: #1c2541;
   --card: rgba(30, 42, 71, 0.82);
-  --border: #33447a;
   --text: #e8eefc;
   --muted: #9aa7c7;
+  --warn: #fbbf24;
+
+  /* Normal theme (values overridden at runtime by the Theme setting) */
   --accent: #4cc9f0;
   --good: #2dd4a7;
   --bad: #f87171;
-  --warn: #fbbf24;
+  --border: #33447a;
+  --accent-strong: var(--accent-strong);
+  --primary-shadow: var(--primary-shadow);
+  --toggle-bg: var(--toggle-bg);
+  --sphere: var(--sphere);
+  --sphere-stroke: var(--sphere-stroke);
+  --map-fill: var(--map-fill);
+  --map-fill-hover: var(--map-fill-hover);
+  --map-stroke: #0b132b;
+
+  /* RGB triplets (no alpha) used in rgba()/blobs/particles; set by JS */
+  --acc-rgb: 76, 201, 240;
+  --good-rgb: 45, 212, 167;
+  --bad-rgb: 248, 113, 113;
+  --rank-rgb: 239, 68, 68;
+  --rank-light-rgb: 248, 113, 113;
+  --rank-dark-rgb: 185, 28, 28;
+
+  /* Rank theme (values overridden at runtime by the Theme setting) */
+  --rank: #ef4444;
+  --rank-light: #f87171;
+  --rank-dark: #b91c1c;
+  --rank-border: #7f1d1d;
+  --rank-bg1: #3b0f1e;
+  --rank-bg2: #1a050d;
+  --rank-bg3: #0a0106;
+  --rank-glow: rgba(220, 38, 38, 0.45);
+  --rank-glow-soft: rgba(248, 113, 113, 0.45);
+  --rank-text: #fca5a5;
+  --rank-dim: #d69a9a;
+  --rank-faint: #a06a6a;
+  --rank-card: rgba(58, 12, 24, 0.85);
+  --rank-good: #fecaca;
+  --rank-bad: #7f1d1d;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -84,18 +119,18 @@ body {
 .blob.b1 {
   width: 55vmax; height: 55vmax;
   left: -12vmax; top: -16vmax;
-  background: radial-gradient(circle, rgba(76, 201, 240, 0.55), rgba(47, 128, 237, 0.15) 60%, transparent 75%);
+  background: radial-gradient(circle, rgba(var(--acc-rgb), 0.55), rgba(var(--acc-rgb), 0.15) 60%, transparent 75%);
 }
 .blob.b2 {
   width: 48vmax; height: 48vmax;
   right: -14vmax; bottom: -12vmax;
-  background: radial-gradient(circle, rgba(45, 212, 167, 0.5), rgba(30, 42, 71, 0.1) 60%, transparent 75%);
+  background: radial-gradient(circle, rgba(var(--good-rgb), 0.5), rgba(30, 42, 71, 0.1) 60%, transparent 75%);
   animation-duration: 22s;
 }
 .blob.b3 {
   width: 40vmax; height: 40vmax;
   left: 34vw; top: 22vh;
-  background: radial-gradient(circle, rgba(251, 191, 36, 0.3), transparent 70%);
+  background: radial-gradient(circle, rgba(var(--acc-rgb), 0.3), transparent 70%);
   animation-duration: 26s;
 }
 @keyframes blobFloat {
@@ -121,14 +156,17 @@ body {
 
 .bg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-/* Rank mode: tint the background toward red to match the evil theme. */
+/* Rank mode: tint the background toward the rank color. */
 body.rank-active .blob.b1 {
-  background: radial-gradient(circle, rgba(248, 113, 113, 0.5), rgba(220, 38, 38, 0.15) 60%, transparent 75%);
+  background: radial-gradient(circle, rgba(var(--rank-light-rgb), 0.5), rgba(var(--rank-dark-rgb), 0.15) 60%, transparent 75%);
 }
 body.rank-active .blob.b2 {
-  background: radial-gradient(circle, rgba(248, 113, 113, 0.4), rgba(30, 42, 71, 0.1) 60%, transparent 75%);
+  background: radial-gradient(circle, rgba(var(--rank-light-rgb), 0.4), rgba(30, 42, 71, 0.1) 60%, transparent 75%);
 }
-body.rank-active .bg-symbols .sym { color: rgba(255, 205, 205, 0.14); }
+body.rank-active .blob.b3 {
+  background: radial-gradient(circle, rgba(var(--rank-light-rgb), 0.25), transparent 70%);
+}
+body.rank-active .bg-symbols .sym { color: rgba(var(--rank-light-rgb), 0.14); }
 
 /* Respect reduced-motion: freeze the animated background. */
 @media (prefers-reduced-motion: reduce) {
@@ -192,7 +230,7 @@ body.rank-active .bg-symbols .sym { color: rgba(255, 205, 205, 0.14); }
 .setting input[type="number"]:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(76, 201, 240, 0.25);
+  box-shadow: 0 0 0 3px var(--toggle-bg);
 }
 
 .setting.toggle:active input[type="checkbox"] {
@@ -234,7 +272,7 @@ body.rank-active .bg-symbols .sym { color: rgba(255, 205, 205, 0.14); }
 }
 
 .toggle input[type="checkbox"]:checked {
-  background: rgba(76, 201, 240, 0.25);
+  background: var(--toggle-bg);
   border-color: var(--accent);
 }
 
@@ -281,11 +319,11 @@ input[type="number"] {
 .btn:active { transform: translateY(0); }
 
 .btn.primary {
-  background: linear-gradient(135deg, #2f80ed, #4cc9f0);
+  background: linear-gradient(135deg, var(--accent-strong), #4cc9f0);
   color: #fff;
   width: 100%;
   font-size: 18px;
-  box-shadow: 0 8px 24px rgba(76, 201, 240, 0.35);
+  box-shadow: 0 8px 24px var(--primary-shadow);
   position: relative;
   overflow: hidden;
 }
@@ -334,13 +372,13 @@ input[type="number"] {
 .btn.stop {
   padding: 8px 18px;
   font-size: 14px;
-  background: rgba(248, 113, 113, 0.15);
-  border: 1px solid rgba(248, 113, 113, 0.5);
-  color: #fca5a5;
+  background: rgba(var(--rank-rgb), 0.15);
+  border: 1px solid rgba(var(--rank-rgb), 0.5);
+  color: var(--rank-text);
 }
 
 .btn.stop:hover {
-  background: rgba(248, 113, 113, 0.3);
+  background: rgba(var(--rank-rgb), 0.3);
   color: #fff;
 }
 
@@ -435,7 +473,7 @@ input[type="number"] {
   height: 100%;
   width: 100%;
   border-radius: 99px;
-  background: linear-gradient(90deg, #2f80ed, #4cc9f0);
+  background: linear-gradient(90deg, var(--accent-strong), #4cc9f0);
   transition: width 0.1s linear;
 }
 
@@ -451,15 +489,15 @@ input[type="number"] {
 }
 
 .feedback.ok {
-  background: rgba(45, 212, 167, 0.15);
+  background: rgba(var(--good-rgb), 0.15);
   color: var(--good);
-  border: 1px solid rgba(45, 212, 167, 0.4);
+  border: 1px solid rgba(var(--good-rgb), 0.4);
 }
 
 .feedback.no {
-  background: rgba(248, 113, 113, 0.15);
+  background: rgba(var(--bad-rgb), 0.15);
   color: var(--bad);
-  border: 1px solid rgba(248, 113, 113, 0.4);
+  border: 1px solid rgba(var(--bad-rgb), 0.4);
 }
 
 .feedback.info {
@@ -491,31 +529,31 @@ input[type="number"] {
   -webkit-touch-callout: none;
 }
 
-.sphere { fill: #14305e; stroke: #3b5b9a; stroke-width: 1; }
+.sphere { fill: var(--sphere); stroke: var(--sphere-stroke); stroke-width: 1; }
 .graticule { fill: none; stroke: rgba(255, 255, 255, 0.06); stroke-width: 0.5; }
 
 .country {
-  fill: #3d5a94;
+  fill: var(--map-fill);
   stroke: #0b132b;
   stroke-width: 0.4;
   transition: fill 0.15s;
   cursor: pointer;
 }
 
-.country:hover { fill: #5b7ec0; }
+.country:hover { fill: var(--map-fill-hover); }
 
-.country.correct { fill: #2dd4a7; stroke: #eafff6; stroke-width: 0.7; }
-.country.wrong   { fill: #f87171; stroke: #ffe4e4; stroke-width: 0.7; }
+.country.correct { fill: var(--good); stroke: #eafff6; stroke-width: 0.7; }
+.country.wrong   { fill: var(--bad); stroke: #ffe4e4; stroke-width: 0.7; }
 
 /* Pulse the answered country so the player clearly sees which was right/wrong.
    Pulsing the FILL color (not just a brightness filter) is much more visible. */
 @keyframes correctPulse {
-  0%, 100% { fill: #2dd4a7; }
-  50%      { fill: #eafff6; }
+  0%, 100% { fill: var(--good); }
+  50%      { fill: color-mix(in srgb, var(--good), white 45%); }
 }
 @keyframes wrongPulse {
-  0%, 100% { fill: #f87171; }
-  50%      { fill: #ffdada; }
+  0%, 100% { fill: var(--bad); }
+  50%      { fill: color-mix(in srgb, var(--bad), white 30%); }
 }
 .country.correct { animation: correctPulse 0.6s ease-in-out 3; }
 .country.wrong   { animation: wrongPulse 0.6s ease-in-out 3; }
@@ -526,6 +564,23 @@ input[type="number"] {
   50%      { stroke-opacity: 0.25; }
 }
 .hl circle { animation: ringPulse 0.6s ease-in-out 3; }
+
+/* When the "Pulse Answer Colors" setting is off, disable the pulse animations. */
+body.no-pulse .country.correct,
+body.no-pulse .country.wrong,
+body.no-pulse .hl circle { animation: none; }
+
+/* Theme color pickers in settings. */
+.color-setting input[type="color"] {
+  width: 48px;
+  height: 36px;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0d1530;
+  cursor: pointer;
+  flex-shrink: 0;
+}
 
 /* Click-catching layer that sits underneath the countries (ocean clicks). */
 .ocean { pointer-events: all; fill: transparent; cursor: pointer; }
@@ -598,11 +653,11 @@ body,
 }
 
 body.rank-active {
-  background: radial-gradient(1200px 800px at 20% -10%, #3b0f1e 0%, #1a050d 45%, #0a0106 100%);
+  background: radial-gradient(1200px 800px at 20% -10%, var(--rank-bg1) 0%, var(--rank-bg2) 45%, var(--rank-bg3) 100%);
 }
 
 body.rank-active .screen {
-  /* menu card backdrop shifts red */
+  /* menu card backdrop shifts to the rank color */
 }
 
 /* Locked (disabled) rank-mode settings */
@@ -614,66 +669,66 @@ input.locked,
 }
 
 input[disabled].locked {
-  color: #d69a9a;
+  color: var(--rank-dim);
 }
 
 body.rank-active .menu-card,
 body.rank-active .results-card {
-  background: rgba(58, 12, 24, 0.85);
-  border-color: #7f1d1d;
-  box-shadow: 0 20px 60px rgba(127, 29, 29, 0.5);
+  background: var(--rank-card);
+  border-color: var(--rank-border);
+  box-shadow: 0 20px 60px var(--rank-glow);
 }
 
 body.rank-active .setting {
   background: rgba(255, 255, 255, 0.04);
-  border-color: #7f1d1d;
+  border-color: var(--rank-border);
 }
 
 body.rank-active .btn.primary {
-  background: linear-gradient(135deg, #dc2626, #f87171);
-  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.45);
+  background: linear-gradient(135deg, var(--rank-dark), var(--rank-light));
+  box-shadow: 0 8px 24px var(--rank-glow);
 }
 
 body.rank-active .toggle input[type="checkbox"]:checked {
-  background: rgba(248, 113, 113, 0.25);
-  border-color: #f87171;
+  background: rgba(var(--rank-light-rgb), 0.25);
+  border-color: var(--rank-light);
 }
 
 body.rank-active .toggle input[type="checkbox"]:checked::after {
-  background: #f87171;
+  background: var(--rank-light);
 }
 
 body.rank-active .currency-box {
-  background: linear-gradient(135deg, #3b0f1e, #4c1d2e);
-  border-color: #7f1d1d;
+  background: linear-gradient(135deg, var(--rank-bg1), #4c1d2e);
+  border-color: var(--rank-border);
 }
 
 body.rank-active .timer-fill {
-  background: linear-gradient(90deg, #dc2626, #f87171);
+  background: linear-gradient(90deg, var(--rank-dark), var(--rank-light));
 }
 
-body.rank-active .timer-fill.low { background: linear-gradient(90deg, #f87171, #fbbf24); }
+body.rank-active .timer-fill.low { background: linear-gradient(90deg, var(--rank-light), #fbbf24); }
 
 body.rank-active .stat {
-  border-color: #7f1d1d;
+  border-color: var(--rank-border);
 }
 
 body.rank-active .map-wrapper {
-  border-color: #7f1d1d;
-  background: #1a050d;
+  border-color: var(--rank-border);
+  background: var(--rank-bg2);
 }
 
-body.rank-active .sphere { fill: #3b0f1e; stroke: #7f1d1d; }
-body.rank-active .country { fill: #7f1d1d; stroke: #2b0606; }
-body.rank-active .country:hover { fill: #b91c1c; }
-body.rank-active .country.correct { fill: #2dd4a7; }
-body.rank-active .country.wrong { fill: #f87171; }
+body.rank-active .sphere { fill: var(--rank-bg1); stroke: var(--rank-border); }
+body.rank-active .country { fill: var(--rank-border); stroke: #2b0606; }
+body.rank-active .country:hover { fill: var(--rank-dark); }
+body.rank-active .country.correct { fill: var(--rank-good); }
+body.rank-active .country.wrong { fill: var(--rank-bad); }
 
 body.rank-active .subtitle,
-body.rank-active .hint { color: #d69a9a; }
+body.rank-active .hint { color: var(--rank-dim); }
 
 body.rank-active .version,
-body.rank-active .credit { color: #a06a6a; }
+body.rank-active .credit { color: var(--rank-faint); }
 
 /* ---------- Player name & rank in menu ---------- */
 .rank-setting { margin-bottom: 18px; }
@@ -709,8 +764,8 @@ body.rank-active .credit { color: #a06a6a; }
   user-select: none;
   -webkit-user-select: none;
   border-radius: 12px;
-  border: 1px solid #7f1d1d;
-  background: rgba(127, 29, 29, 0.15);
+  border: 1px solid var(--rank-border);
+  background: rgba(var(--rank-rgb), 0.15);
   padding: 0 18px;
   transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
   flex-shrink: 0;
@@ -728,22 +783,22 @@ body.rank-active .credit { color: #a06a6a; }
   font-size: 15px;
   font-weight: 800;
   letter-spacing: 1px;
-  color: #fca5a5;
-  text-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
+  color: var(--rank-text);
+  text-shadow: 0 0 8px var(--rank-glow-soft);
   white-space: nowrap;
 }
 
 .rank-toggle:hover { filter: brightness(1.15); }
 
 .rank-toggle:has(input:checked) {
-  background: rgba(220, 38, 38, 0.35);
-  border-color: #f87171;
-  box-shadow: 0 0 18px rgba(248, 113, 113, 0.45);
+  background: rgba(var(--rank-rgb), 0.35);
+  border-color: var(--rank-light);
+  box-shadow: 0 0 18px var(--rank-glow-soft);
 }
 
 .rank-toggle:has(input:checked) .rank-label {
   color: #ffdada;
-  text-shadow: 0 0 12px rgba(248, 113, 113, 0.9);
+  text-shadow: 0 0 12px var(--rank-glow-soft);
   animation: rankPulse 1.2s ease-in-out infinite;
 }
 
@@ -774,11 +829,11 @@ body.rank-active .credit { color: #a06a6a; }
   white-space: nowrap;
 }
 
-.rankStat { border-color: rgba(248, 113, 113, 0.5); }
+.rankStat { border-color: rgba(var(--rank-rgb), 0.5); }
 
 .rank-badge {
-  color: #f87171;
-  text-shadow: 0 0 10px rgba(248, 113, 113, 0.6);
+  color: var(--rank-light);
+  text-shadow: 0 0 10px var(--rank-glow-soft);
 }
 
 /* ---------- Countdown overlay ---------- */
@@ -823,8 +878,8 @@ body.rank-active .credit { color: #a06a6a; }
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 1px;
-  color: #f87171;
-  text-shadow: 0 0 10px rgba(248, 113, 113, 0.6);
+  color: var(--rank-light);
+  text-shadow: 0 0 10px var(--rank-glow-soft);
 }
 
 /* ---------- Screen transitions & entrance animations ---------- */
@@ -909,8 +964,8 @@ body.rank-active .credit { color: #a06a6a; }
   white-space: nowrap;
 }
 
-.score-pop.good-pop { color: #4ade80; }
-.score-pop.bad-pop  { color: #f87171; }
+.score-pop.good-pop { color: var(--good); }
+.score-pop.bad-pop  { color: var(--bad); }
 .score-pop.info-pop { color: var(--accent); }
 
 @keyframes scorePopUp {
@@ -952,9 +1007,9 @@ body.rank-active .credit { color: #a06a6a; }
   margin: 16px auto 0;
   padding: 14px 22px;
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.25), rgba(127, 29, 29, 0.45));
-  border: 2px solid #f87171;
-  box-shadow: 0 0 24px rgba(248, 113, 113, 0.35);
+  background: linear-gradient(135deg, rgba(var(--rank-rgb), 0.25), rgba(var(--rank-rgb), 0.45));
+  border: 2px solid var(--rank-light);
+  box-shadow: 0 0 24px var(--rank-glow-soft);
   display: inline-block;
   animation: rankScoreIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
 }
@@ -968,7 +1023,7 @@ body.rank-active .credit { color: #a06a6a; }
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 3px;
-  color: #fca5a5;
+  color: var(--rank-text);
 }
 
 .rank-score-value {
@@ -976,13 +1031,13 @@ body.rank-active .credit { color: #a06a6a; }
   font-weight: 900;
   line-height: 1.1;
   color: #ffdada;
-  text-shadow: 0 0 24px rgba(248, 113, 113, 0.8);
+  text-shadow: 0 0 24px var(--rank-glow-soft);
 }
 
 .rank-score-sub {
   font-size: 13px;
   font-weight: 700;
-  color: #fca5a5;
+  color: var(--rank-text);
 }
 
 /* ---------- Results ---------- */
@@ -1016,9 +1071,9 @@ body.rank-active .credit { color: #a06a6a; }
 }
 
 .btn.ranked {
-  background: linear-gradient(135deg, #dc2626, #f87171);
+  background: linear-gradient(135deg, var(--rank-dark), var(--rank-light));
   color: #fff;
-  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.4);
+  box-shadow: 0 8px 24px var(--rank-glow);
 }
 .btn.ranked:hover { filter: brightness(1.12); }
 
@@ -1039,11 +1094,11 @@ body.rank-active .credit { color: #a06a6a; }
 }
 
 .btn.danger {
-  background: rgba(248, 113, 113, 0.12);
-  border: 1px solid rgba(248, 113, 113, 0.5);
-  color: #fca5a5;
+  background: rgba(var(--rank-rgb), 0.12);
+  border: 1px solid rgba(var(--rank-rgb), 0.5);
+  color: var(--rank-text);
 }
-.btn.danger:hover { background: rgba(248, 113, 113, 0.25); color: #fff; }
+.btn.danger:hover { background: rgba(var(--rank-rgb), 0.25); color: #fff; }
 
 /* ================= Settings overlay ================= */
 .settings-overlay {
@@ -1280,9 +1335,9 @@ body.rank-active .credit { color: #a06a6a; }
 }
 
 .rank-opt {
-  border: 1px solid rgba(248, 113, 113, 0.5);
-  background: rgba(127, 29, 29, 0.15);
-  color: #fca5a5;
+  border: 1px solid rgba(var(--rank-rgb), 0.5);
+  background: rgba(var(--rank-rgb), 0.15);
+  color: var(--rank-text);
   font-size: 20px;
   font-weight: 800;
   letter-spacing: 1.5px;
@@ -1292,8 +1347,8 @@ body.rank-active .credit { color: #a06a6a; }
   transition: background 0.15s, border-color 0.15s, transform 0.1s;
 }
 .rank-opt:hover {
-  background: rgba(220, 38, 38, 0.3);
-  border-color: #f87171;
+  background: rgba(var(--rank-rgb), 0.3);
+  border-color: var(--rank-light);
   color: #ffdada;
   transform: translateY(-2px);
 }
@@ -1303,6 +1358,6 @@ body.rank-active .credit { color: #a06a6a; }
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.5px;
-  color: #d69a9a;
+  color: var(--rank-dim);
   margin-top: 2px;
 }

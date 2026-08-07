@@ -817,6 +817,9 @@ function startGame() {
   // Completely reset the map screen before anything from the previous game.
   resetGameScreen();
 
+  // Apply the pulse preference.
+  setPulse($("#pulseToggleInput").checked);
+
   // stop any running timers
   stopTotalTimer();
   if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); clearTimer(game.countdownTimerId); }
@@ -1398,6 +1401,9 @@ function saveSettings() {
       showFullName: $("#showFullNameInput").checked,
       showCountryNames: $("#showCountryNamesInput").checked,
       tapSelect: $("#tapSelectInput").checked,
+      pulse: $("#pulseToggleInput").checked,
+      themeNormal: $("#themeNormalInput").value,
+      themeRank: $("#themeRankInput").value,
       sound: $("#soundInput").checked,
       examMode: $("#examModeInput").checked,
       playerName: $("#playerNameInput").value,
@@ -1421,6 +1427,9 @@ function loadSettings() {
     if (d.showFullName !== undefined) $("#showFullNameInput").checked = !!d.showFullName;
     if (d.showCountryNames !== undefined) $("#showCountryNamesInput").checked = !!d.showCountryNames;
     if (d.tapSelect !== undefined) $("#tapSelectInput").checked = !!d.tapSelect;
+    if (d.pulse !== undefined) $("#pulseToggleInput").checked = !!d.pulse;
+    if (d.themeNormal !== undefined) $("#themeNormalInput").value = d.themeNormal;
+    if (d.themeRank !== undefined) $("#themeRankInput").value = d.themeRank;
     if (d.sound !== undefined) $("#soundInput").checked = !!d.sound;
     if (d.examMode !== undefined) $("#examModeInput").checked = !!d.examMode;
     if (d.playerName !== undefined) $("#playerNameInput").value = d.playerName;
@@ -1615,9 +1624,14 @@ function resetDefaults() {
   $("#soundInput").checked = true;
   $("#examModeInput").checked = false;
   $("#playerNameInput").value = "";
+  $("#pulseToggleInput").checked = true;
+  $("#themeNormalInput").value = "#4cc9f0";
+  $("#themeRankInput").value = "#ef4444";
   setAllCountries(true);   // reset country toggles to all-on
   syncRoundsMax();
   syncIntervalState();
+  applyTheme();
+  setPulse(true);
   saveSettings();
 }
 
@@ -1741,7 +1755,10 @@ function setupParticleCanvas() {
 
   const step = () => {
     ctx.clearRect(0, 0, W, H);
-    const c = document.body.classList.contains("rank-active") ? "248,113,113" : "76,201,240";
+    const rootStyle = getComputedStyle(document.documentElement);
+    const c = (document.body.classList.contains("rank-active")
+      ? rootStyle.getPropertyValue("--rank-light-rgb")
+      : rootStyle.getPropertyValue("--acc-rgb")).trim() || "76, 201, 240";
     for (const p of P) {
       p.x += p.vx; p.y += p.vy;
       if (p.x < -10) p.x = W + 10; else if (p.x > W + 10) p.x = -10;
@@ -1805,6 +1822,82 @@ function initMenuBackground() {
   });
 }
 
+// ================= Theme (color customization) =================
+// Small color helpers (no dependencies).
+function clampByte(n) { return Math.max(0, Math.min(255, Math.round(n))); }
+
+function hexToRgb(hex) {
+  const h = (hex || "").replace("#", "");
+  if (h.length !== 6) return { r: 76, g: 201, b: 240 };
+  return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
+}
+
+// Shift a color toward black (amt<0) or white (amt>0) by a fraction of the way.
+function shade(hex, amt) {
+  const { r, g, b } = hexToRgb(hex);
+  const t = amt >= 0 ? 255 : 0;
+  const a = Math.abs(amt);
+  return `#${[r, g, b].map(c => clampByte(c + (t - c) * a).toString(16).padStart(2, "0")).join("")}`;
+}
+
+const rgbStr = c => `${c.r}, ${c.g}, ${c.b}`;
+
+// Apply the chosen Normal + Rank theme colors to the CSS variables.
+function applyTheme() {
+  const normal = $("#themeNormalInput").value || "#4cc9f0";
+  const rank = $("#themeRankInput").value || "#ef4444";
+
+  const acc = hexToRgb(normal);
+  const rk = hexToRgb(rank);
+
+  const root = document.documentElement.style;
+  // Normal palette
+  root.setProperty("--accent", normal);
+  root.setProperty("--accent-strong", shade(normal, -0.18));
+  root.setProperty("--good", shade(normal, 0.30));        // Correct = light shade
+  root.setProperty("--bad", shade(normal, -0.30));        // Wrong = dark shade
+  root.setProperty("--border", shade(normal, -0.12));
+  root.setProperty("--acc-rgb", rgbStr(acc));
+  root.setProperty("--good-rgb", rgbStr(hexToRgb(shade(normal, 0.30))));
+  root.setProperty("--bad-rgb", rgbStr(hexToRgb(shade(normal, -0.30))));
+  root.setProperty("--primary-shadow", `rgba(${rgbStr(acc)}, 0.35)`);
+  root.setProperty("--toggle-bg", `rgba(${rgbStr(acc)}, 0.25)`);
+  // Map tints (dark, desaturated for legibility)
+  root.setProperty("--sphere", shade(normal, -0.55));
+  root.setProperty("--sphere-stroke", shade(normal, -0.45));
+  root.setProperty("--map-fill", shade(normal, -0.45));
+  root.setProperty("--map-fill-hover", shade(normal, -0.25));
+  root.setProperty("--map-stroke", shade(normal, -0.75));
+
+  // Rank palette
+  root.setProperty("--rank", rank);
+  root.setProperty("--rank-light", shade(rank, 0.12));
+  root.setProperty("--rank-dark", shade(rank, -0.25));
+  root.setProperty("--rank-border", shade(rank, -0.35));
+  root.setProperty("--rank-bg1", shade(rank, -0.5));
+  root.setProperty("--rank-bg2", shade(rank, -0.68));
+  root.setProperty("--rank-bg3", shade(rank, -0.8));
+  root.setProperty("--rank-glow", `rgba(${rgbStr(rk)}, 0.45)`);
+  root.setProperty("--rank-glow-soft", `rgba(${rgbStr(rk)}, 0.45)`);
+  root.setProperty("--rank-text", shade(rank, 0.32));
+  root.setProperty("--rank-dim", shade(rank, 0.10));
+  root.setProperty("--rank-faint", shade(rank, -0.15));
+  root.setProperty("--rank-card", `rgba(${rgbStr(hexToRgb(shade(rank, -0.5)))}, 0.85)`);
+  root.setProperty("--rank-rgb", rgbStr(rk));
+  root.setProperty("--rank-light-rgb", rgbStr(hexToRgb(shade(rank, 0.12))));
+  root.setProperty("--rank-dark-rgb", rgbStr(hexToRgb(shade(rank, -0.25))));
+  root.setProperty("--rank-good", shade(rank, 0.30));      // rank Correct = light
+  root.setProperty("--rank-bad", shade(rank, -0.30));      // rank Wrong = dark
+
+  // Keep particles in sync (they read these next frame via setMenuBackgroundActive).
+  if (typeof setMenuBackgroundActive === "function" && menuBgActive) setMenuBackgroundActive(true);
+}
+
+// Enable/disable the answer pulse animation from the setting.
+function setPulse(enabled) {
+  document.body.classList.toggle("no-pulse", !enabled);
+}
+
 // ================= Wire up UI =================
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
@@ -1816,6 +1909,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
   initSelectedCountries();
   renderCountryList();
+  applyTheme();                    // apply chosen Normal/Rank colors
+  setPulse($("#pulseToggleInput").checked);
   applyRankMenuState();
   syncRoundsMax();
   syncIntervalState();
@@ -1826,11 +1921,18 @@ document.addEventListener("DOMContentLoaded", () => {
     "guessTimeInput", "intervalToggleInput", "intervalTimeInput",
     "maxGuessesInput", "snapRadiusInput", "roundsInput",
     "showFullNameInput", "showCountryNamesInput", "tapSelectInput", "soundInput",
-    "examModeInput", "playerNameInput"
+    "examModeInput", "playerNameInput", "pulseToggleInput",
+    "themeNormalInput", "themeRankInput"
   ].forEach(id => {
     const el = $(id);
     if (el) el.addEventListener("change", saveSettings);
   });
+
+  // Re-apply the theme live as the color pickers change.
+  $("#themeNormalInput").addEventListener("input", applyTheme);
+  $("#themeRankInput").addEventListener("input", applyTheme);
+  // Pulse toggle applied live.
+  $("#pulseToggleInput").addEventListener("change", () => setPulse($("#pulseToggleInput").checked));
 
   // Country toggle controls.
   $("#countrySearch").addEventListener("input", e => {

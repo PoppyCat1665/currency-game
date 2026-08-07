@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Currency Guessing Game</title>
-  <link rel="stylesheet" href="styles.css?v=40">
+  <link rel="stylesheet" href="styles.css?v=41">
 </head>
 <body>
 
@@ -36,7 +36,7 @@
 
       <p class="hint">You'll be shown a currency – click the country that uses it before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v3.14e</p>
+      <p class="version" id="appVersion">v3.14f</p>
     </div>
   </div>
 
@@ -56,6 +56,7 @@
           <button class="cat-btn" data-cat="audio">Audio</button>
           <button class="cat-btn" data-cat="study">Study</button>
           <button class="cat-btn" data-cat="countries">Countries</button>
+          <button class="cat-btn" data-cat="theme">Theme</button>
           <button class="cat-btn" data-cat="player">Player</button>
           <button class="cat-btn" data-cat="other">Other</button>
         </nav>
@@ -107,6 +108,11 @@
               <span class="info-icon" data-info="Ranked: fixed OFF">ⓘ</span>
               <input id="showCountryNamesInput" type="checkbox" checked>
             </label>
+            <label class="setting toggle">
+              <span>Pulse Answer Colors</span>
+              <input id="pulseToggleInput" type="checkbox" checked>
+            </label>
+            <p class="setting-note">Flash the answered countries (correct in light, wrong in dark) when the answer is revealed.</p>
           </section>
 
           <section class="cat-section" data-section="map">
@@ -154,6 +160,19 @@
             <div id="countryList" class="country-list"></div>
             <p class="setting-note">Only currencies used by the toggled-on countries appear. Ignored in Ranked and Exam mode.</p>
             <p class="setting-note hidden" id="countriesDisabledNote">Disabled while 📚 Exam Mode is on.</p>
+          </section>
+
+          <section class="cat-section" data-section="theme">
+            <h3>Theme</h3>
+            <label class="setting color-setting">
+              <span>Normal Mode Color</span>
+              <input id="themeNormalInput" type="color" value="#4cc9f0">
+            </label>
+            <label class="setting color-setting">
+              <span>Rank Mode Color</span>
+              <input id="themeRankInput" type="color" value="#ef4444">
+            </label>
+            <p class="setting-note">Recolors the whole app — buttons, borders, map blobs, and answer colors. Correct uses a light shade and Wrong a dark shade of your color.</p>
           </section>
 
           <section class="cat-section" data-section="player">
@@ -297,11 +316,11 @@
     </div>
   </div>
 
-  <script src="lib/d3.min.js?v=40"></script>
-  <script src="lib/topojson.min.js?v=40"></script>
-  <script src="lib/world.js?v=40"></script>
-  <script src="continents.js?v=40"></script>
-  <script src="data.js?v=40"></script>
-  <script src="game.js?v=40"></script>
+  <script src="lib/d3.min.js?v=41"></script>
+  <script src="lib/topojson.min.js?v=41"></script>
+  <script src="lib/world.js?v=41"></script>
+  <script src="continents.js?v=41"></script>
+  <script src="data.js?v=41"></script>
+  <script src="game.js?v=41"></script>
 </body>
 </html>
