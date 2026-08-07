@@ -790,7 +790,11 @@ function startGame() {
     questions = questions.filter(c => examSet.has(c.code));
   }
   questions = shuffle(questions);
-  const roundsRequested = Math.max(1, parseInt($("#roundsInput").value, 10) || (examMode ? EXAM_COUNT : 40));
+  // Rounds: ranked uses the chosen rank mode (50/70/100/all); casual uses the
+  // Rounds setting.
+  const roundsRequested = rankMode
+    ? (pendingRankRounds === "all" ? questions.length : pendingRankRounds)
+    : Math.max(1, parseInt($("#roundsInput").value, 10) || (examMode ? EXAM_COUNT : 40));
   const rounds = Math.min(roundsRequested, questions.length);
   questions = questions.slice(0, rounds);
 
@@ -1291,16 +1295,40 @@ function openSettings() {
   selectCategory("gameplay");
   applyRankMenuState();            // ensure inputs reflect the current (non-rank) menu state
   syncIntervalState();
-  const ov = $("#settingsOverlay");
+  openOverlay("settingsOverlay");
+}
+
+function closeSettings() { closeOverlay("settingsOverlay"); }
+
+// Generic overlay open/close with a short fade/slide animation.
+function openOverlay(id) {
+  const ov = $(id);
   ov.classList.remove("hidden");
   void ov.offsetWidth;             // force reflow so the open transition plays
   ov.classList.add("open");
 }
-
-function closeSettings() {
-  const ov = $("#settingsOverlay");
+function closeOverlay(id) {
+  const ov = $(id);
   ov.classList.remove("open");
   setTimeout(() => ov.classList.add("hidden"), 220);
+}
+
+// Rank mode picker: choose how many rounds the ranked game plays.
+// "all" = every available currency (respects Exam mode), otherwise a fixed count.
+let pendingRankRounds = 50;        // default rank mode
+
+function openRankPicker() {
+  const poolTotal = $("#examModeInput").checked ? EXAM_COUNT : FULL_COUNT;
+  $("#rankAllCount").textContent = poolTotal;
+  openOverlay("rankPicker");
+}
+
+function startRankMode(rounds) {
+  pendingRankRounds = rounds;
+  $("#rankModeInput").checked = true;
+  applyRankMenuState();
+  closeOverlay("rankPicker");
+  startGame();
 }
 
 // Restore every configurable setting to the game's defaults.
@@ -1349,10 +1377,16 @@ document.addEventListener("DOMContentLoaded", () => {
     applyRankMenuState();
     startGame();
   });
-  $("#rankedBtn").addEventListener("click", () => {
-    $("#rankModeInput").checked = true;
-    applyRankMenuState();
-    startGame();
+  $("#rankedBtn").addEventListener("click", openRankPicker);
+
+  // Rank picker controls.
+  document.querySelectorAll(".rank-opt").forEach(btn => {
+    btn.addEventListener("click", () => startRankMode(btn.dataset.rounds));
+  });
+  $("#rankCloseBtn").addEventListener("click", () => closeOverlay("rankPicker"));
+  $("#rankBackBtn").addEventListener("click", () => closeOverlay("rankPicker"));
+  $("#rankPicker").addEventListener("click", e => {
+    if (e.target === $("#rankPicker")) closeOverlay("rankPicker");   // click backdrop
   });
 
   // Settings overlay open/close/navigation.
@@ -1367,7 +1401,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target === $("#settingsOverlay")) closeSettings();   // click backdrop
   });
   window.addEventListener("keydown", e => {
-    if (e.key === "Escape" && !$("#settingsOverlay").classList.contains("hidden")) closeSettings();
+    if (e.key !== "Escape") return;
+    if (!$("#settingsOverlay").classList.contains("hidden")) closeSettings();
+    else if (!$("#rankPicker").classList.contains("hidden")) closeOverlay("rankPicker");
   });
   // Interval Wait off => Interval Time disabled.
   $("#intervalToggleInput").addEventListener("change", syncIntervalState);

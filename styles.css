@@ -693,6 +693,10 @@ body.rank-active .credit { color: #a06a6a; }
   justify-content: center;
   background: rgba(5, 10, 25, 0.72);
   z-index: 20;
+  /* Never intercept map clicks. During the countdown phase ("countdown") the
+     game ignores clicks anyway, and after "GO" the overlay is hidden. This
+     prevents a lingering overlay from ever blocking country selection. */
+  pointer-events: none;
 }
 
 .countdown-text {
@@ -1056,4 +1060,42 @@ body.rank-active .credit { color: #a06a6a; }
     overflow-x: auto;
   }
   .cat-btn { text-align: center; padding: 8px 12px; white-space: nowrap; }
+}
+
+/* ================= Rank mode picker ================= */
+.rank-picker { max-width: 420px; }
+
+.rank-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 22px;
+}
+
+.rank-opt {
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: rgba(127, 29, 29, 0.15);
+  color: #fca5a5;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  border-radius: 14px;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.rank-opt:hover {
+  background: rgba(220, 38, 38, 0.3);
+  border-color: #f87171;
+  color: #ffdada;
+  transform: translateY(-2px);
+}
+.rank-opt:active { transform: scale(0.97); }
+.rank-opt .rank-opt-sub {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #d69a9a;
+  margin-top: 2px;
 }

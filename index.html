@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Currency Guessing Game</title>
-  <link rel="stylesheet" href="styles.css?v=21">
+  <link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
 
@@ -26,7 +26,7 @@
 
       <p class="hint">You'll be shown a currency – click the country that uses it before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v3.0</p>
+      <p class="version" id="appVersion">v3.1</p>
     </div>
   </div>
 
@@ -142,6 +142,37 @@
     </div>
   </div>
 
+  <!-- ========== RANK MODE PICKER ========== -->
+  <div id="rankPicker" class="settings-overlay hidden">
+    <div class="settings-panel rank-picker">
+      <div class="settings-header">
+        <h2>😈 Choose Rank Mode</h2>
+        <button id="rankCloseBtn" class="btn icon" aria-label="Close rank picker">✕</button>
+      </div>
+      <div class="rank-options">
+        <button class="rank-opt" data-rounds="50">
+          RANK 50
+          <span class="rank-opt-sub">50 rounds</span>
+        </button>
+        <button class="rank-opt" data-rounds="70">
+          RANK 70
+          <span class="rank-opt-sub">70 rounds</span>
+        </button>
+        <button class="rank-opt" data-rounds="100">
+          RANK 100
+          <span class="rank-opt-sub">100 rounds</span>
+        </button>
+        <button class="rank-opt" data-rounds="all">
+          RANK <span id="rankAllCount">–</span>
+          <span class="rank-opt-sub">every available currency</span>
+        </button>
+      </div>
+      <div class="settings-footer">
+        <button id="rankBackBtn" class="btn ghost">Back</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ========== GAMEPLAY ========== -->
   <div id="game" class="screen hidden">
     <header class="game-header">
@@ -228,10 +259,10 @@
     </div>
   </div>
 
-  <script src="lib/d3.min.js?v=21"></script>
-  <script src="lib/topojson.min.js?v=21"></script>
-  <script src="lib/world.js?v=21"></script>
-  <script src="data.js?v=21"></script>
-  <script src="game.js?v=21"></script>
+  <script src="lib/d3.min.js?v=22"></script>
+  <script src="lib/topojson.min.js?v=22"></script>
+  <script src="lib/world.js?v=22"></script>
+  <script src="data.js?v=22"></script>
+  <script src="game.js?v=22"></script>
 </body>
 </html>
