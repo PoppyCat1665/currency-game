@@ -22,7 +22,7 @@
 
     <div class="menu-card">
       <h1>🌍 Currency Guessing</h1>
-      <p class="subtitle">A fast study tool to memorize currencies and their countries before your exam.</p>
+      <p class="subtitle">A fast study tool to memorize currencies and their countries before your MED exam.</p>
 
       <!-- Hidden input drives rank mode. Set by the PLAY / RANKED buttons. -->
       <input id="rankModeInput" type="checkbox" class="hidden">
@@ -33,10 +33,12 @@
       </div>
 
       <button id="settingsBtn" class="btn ghost">⚙ &nbsp;SETTINGS</button>
+      <button id="replayBtn" class="btn ghost">🎬 &nbsp;REPLAY</button>
+      <input id="replayFileInput" type="file" accept="application/json,.json" class="hidden">
 
       <p class="hint">You'll be shown a currency – click the country that uses it before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v3.14j</p>
+      <p class="version" id="appVersion">v3.15</p>
     </div>
   </div>
 
@@ -109,9 +111,9 @@
             </label>
             <label class="setting toggle">
               <span>Pulse Answer Colors</span>
-              <input id="pulseToggleInput" type="checkbox" checked>
+              <input id="pulseToggleInput" type="checkbox" checked disabled>
             </label>
-            <p class="setting-note">Flash the answered countries (correct in light, wrong in dark) when the answer is revealed.</p>
+            <p class="setting-note" id="pulseNote">Unavailable — the answer pulse only plays when there's no interval wait, so turn off Interval Wait to use it.</p>
           </section>
 
           <section class="cat-section" data-section="map">
@@ -279,6 +281,12 @@
         <div id="countdownText" class="countdown-text">3</div>
       </div>
     </div>
+
+    <div id="replayTimeline" class="replay-timeline hidden">
+      <span class="replay-time" id="replayTimeCur">0:00</span>
+      <input id="replaySeek" type="range" min="0" max="100" step="1" value="0">
+      <span class="replay-time" id="replayTimeTotal">0:00</span>
+    </div>
   </div>
 
   <!-- ========== RESULTS ========== -->
@@ -305,7 +313,14 @@
       </div>
       <div class="results-buttons">
         <button id="playAgainBtn" class="btn primary">Play Again</button>
+        <button id="detailsBtn" class="btn">Details</button>
+        <button id="downloadReplayBtn" class="btn hidden">⬇ Replay</button>
         <button id="mainMenuBtn" class="btn">Return to Main Menu</button>
+      </div>
+      <div id="resultsDetails" class="results-details hidden">
+        <h3>Enabled Countries</h3>
+        <p class="detail-count" id="detailCount"></p>
+        <div id="detailContinents"></div>
       </div>
     </div>
   </div>

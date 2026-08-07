@@ -407,6 +407,7 @@ input[type="number"] {
 #game { flex-direction: column; padding: 14px 18px; gap: 0; }
 
 .game-header {
+  position: relative;
   width: 100%;
   max-width: 1500px;
   display: flex;
@@ -415,25 +416,45 @@ input[type="number"] {
   margin-bottom: 10px;
 }
 
+/* Left + right columns are equal-width tracks, so the center stats stay pinned
+   while the currency box sizes to its own content. */
 .hud {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 16px;
-  flex-wrap: wrap;
 }
 
 .currency-box {
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
   background: linear-gradient(135deg, #1b2a52, #26355c);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 10px 22px;
 }
 
-.currency-name { font-size: 24px; font-weight: 800; letter-spacing: 0.3px; }
+.currency-name {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .currency-symbol { font-size: 14px; color: var(--accent); margin-top: 2px; }
 
-.hud-stats { display: flex; gap: 14px; }
+.hud-stats { justify-self: center; display: flex; gap: 14px; }
+
+.hud-right {
+  justify-self: end;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
 
 .stat {
   background: rgba(255, 255, 255, 0.04);
@@ -484,12 +505,23 @@ input[type="number"] {
 .timer-fill.low { background: linear-gradient(90deg, #f87171, #fbbf24); }
 
 /* ---------- Feedback ---------- */
+/* Absolutely positioned so showing a guess notification never pushes the map
+   down or shrinks it — it overlays the top edge of the map instead. */
 .feedback {
+  position: absolute;
+  top: calc(100% - 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
   text-align: center;
   font-size: 16px;
   font-weight: 700;
   padding: 8px 14px;
   border-radius: 10px;
+  white-space: nowrap;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .feedback.ok {
@@ -521,6 +553,47 @@ input[type="number"] {
   overflow: hidden;
   background: #0a1732;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Replay cursor: shows where the player's pointer was during the run. */
+.replay-cursor {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  background: rgba(76, 201, 240, 0.35);
+  box-shadow: 0 0 0 2px rgba(76, 201, 240, 0.55), 0 0 14px rgba(76, 201, 240, 0.8);
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* Replay timeline: scrubber bar under the map. */
+.replay-timeline {
+  width: 100%;
+  max-width: 1500px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.replay-timeline input[type="range"] {
+  flex: 1;
+  height: 6px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.replay-time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  min-width: 38px;
+  text-align: center;
 }
 
 #map {
@@ -556,6 +629,10 @@ input[type="number"] {
   50%      { stroke-opacity: 0.25; }
 }
 .hl circle { animation: ringPulse 0.6s ease-in-out 3; }
+
+/* Rings from a pulse that overlaps into the next round fade out and vanish
+   instead of lingering on the map. */
+.hl.fade-out { transition: opacity 0.45s ease; opacity: 0; }
 
 /* When the "Pulse Answer Colors" setting is off, disable the ring pulse. */
 body.no-pulse .hl circle { animation: none; }
@@ -824,10 +901,12 @@ body.rank-active .credit { color: var(--rank-faint); }
 
 /* ---------- Player name & rank badge in HUD ---------- */
 .hud-right {
+  justify-self: end;
+  min-width: 0;
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   gap: 12px;
-  flex-shrink: 0;
 }
 
 .player-name-badge {
@@ -1066,8 +1145,30 @@ body.rank-active .credit { color: var(--rank-faint); }
 .good { color: var(--good); }
 .bad  { color: var(--bad); }
 
-.results-buttons { display: flex; gap: 12px; }
-.results-buttons .btn { flex: 1; }
+.results-buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+.results-buttons .btn { flex: 1; min-width: 130px; }
+
+/* Results details: per-mode list of enabled countries. */
+.results-details {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  text-align: left;
+}
+.results-details h3 { margin: 0 0 12px; font-size: 15px; letter-spacing: 1px; }
+.detail-mode {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.detail-mode h4 { margin: 0 0 4px; font-size: 13px; color: var(--accent); }
+.detail-count { margin: 0 0 4px; font-size: 12px; opacity: 0.7; }
+.detail-list { margin: 0; font-size: 12px; line-height: 1.6; }
+#detailContinents h4 { margin: 12px 0 4px; font-size: 13px; color: var(--accent); }
+#detailContinents h4:first-child { margin-top: 0; }
+#detailContinents .detail-list { margin-bottom: 6px; }
 
 /* ================= New menu: mode buttons ================= */
 .mode-buttons {

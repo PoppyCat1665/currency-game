@@ -232,6 +232,14 @@ function initMap() {
     tapState = { x: ev.clientX, y: ev.clientY, t: performance.now(), moved: false };
   }, true);
   svgNode.addEventListener("pointermove", ev => {
+    // Record cursor movement for the replay (also fires without tapState).
+    if (replayRec && game && game.phase !== "done" && game.phase !== "idle") {
+      const rect = document.querySelector(".map-wrapper");
+      if (rect) {
+        const r = rect.getBoundingClientRect();
+        replayRecordPointer(ev.clientX - r.left, ev.clientY - r.top);
+      }
+    }
     if (!tapState) return;
     if (Math.hypot(ev.clientX - tapState.x, ev.clientY - tapState.y) > 8) tapState.moved = true;
   }, true);
@@ -377,6 +385,7 @@ function scheduleZoom(transform) {
     pendingZoom = null;
     mapG.attr("transform", currentZoom);
     renderLabels();
+    replayRecordZoom();
   });
 }
 
@@ -571,14 +580,19 @@ function resetCountryClasses() {
 // correct/wrong colors are clearly visible (works even if CSS fill animation
 // is unsupported). Respects the "Pulse Answer Colors" setting.
 let flashTimer = null;
+let flashTargets = null;    // last countries flashed, so a new flash can reset them
 function flashAnswer(ids, kind) {
   if (flashTimer) { clearInterval(flashTimer); flashTimer = null; }
+  // Reset the previous flash's fill so a country never stays bright when a
+  // new flash starts (e.g. a wrong guess mid-pulse).
+  if (flashTargets) { flashTargets.style("fill", null); flashTargets = null; }
   if (!game || !game.pulse) return;
   const root = getComputedStyle(document.documentElement);
   const base = root.getPropertyValue(kind === "correct" ? "--good" : "--bad").trim();
   const peak = root.getPropertyValue(kind === "correct" ? "--good-pulse" : "--bad-pulse").trim();
   if (!base) return;
   const targets = mapG.selectAll("path.country").filter(d => ids.includes(d.id));
+  flashTargets = targets;
   let on = false;
   let n = 0;
   flashTimer = setInterval(() => {
@@ -587,6 +601,7 @@ function flashAnswer(ids, kind) {
     if (++n >= 5) {
       clearInterval(flashTimer);
       flashTimer = null;
+      flashTargets = null;
       targets.style("fill", null);   // let the class color show again
     }
   }, 140);
@@ -639,6 +654,7 @@ function showFeedback(type, msg) {
   const fb = $("#feedback");
   fb.className = "feedback " + type;
   fb.textContent = msg;
+  replayRecord("feedback", { kind: type, msg });
 }
 
 function hideFeedback() {
@@ -656,6 +672,7 @@ let scoreAnimFrame = null;   // cancel any in-flight score tween
 function updateScoreDisplay() {
   const el = $("#score");
   const target = game.score;
+  replayRecord("score", { value: target });
   if (!game.rankMode) {
     el.textContent = target;
     game.previousScore = target;
@@ -711,6 +728,7 @@ function updateStreakPill() {
   pill.classList.remove("streak-bump");
   void pill.offsetWidth;
   pill.classList.add("streak-bump");
+  replayRecord("streak", { value: game.streak || 0 });
 }
 
 // ================= Timers =================
@@ -830,6 +848,7 @@ function startInterval(isFinal) {
 
   $("#intervalLeft").textContent = (dur / 1000).toFixed(1) + "s";
   $("#intervalBar").style.width = "0%";
+  replayRecord("interval", { final: isFinal, duration: dur });
   tick();
   game.intervalTimerId = setInterval(tick, 50);
 }
@@ -872,14 +891,15 @@ function resetGameScreen() {
   $("#intervalSection").classList.add("hidden");
   $("#guessBar").classList.remove("low");
   $("#guessBar").style.width = "100%";
+
+  // Hide the replay timeline and results details panel.
+  $("#replayTimeline").classList.add("hidden");
+  $("#resultsDetails").classList.add("hidden");
 }
 
 function startGame() {
   // Completely reset the map screen before anything from the previous game.
   resetGameScreen();
-
-  // Apply the pulse preference.
-  setPulse($("#pulseToggleInput").checked);
 
   // stop any running timers
   stopTotalTimer();
@@ -902,6 +922,10 @@ function startGame() {
   const showCountryNames = $("#showCountryNamesInput").checked;
   const tapSelect = $("#tapSelectInput").checked;
   soundsEnabled = $("#soundInput").checked;
+
+  // Apply the pulse preference. Pulse is forced off whenever an interval wait
+  // is set, so the answer pulse never overlaps the pause between rounds.
+  setPulse(intervalSec > 0 ? false : $("#pulseToggleInput").checked);
 
   // 📚 Exam mode: ON = only the classic study list.
   // OFF = every currency in data.js is a playable target (currently covers
@@ -978,6 +1002,20 @@ function startGame() {
     guessTimerId: null,
     intervalTimerId: null,
     countdownTimerId: null,
+    enabledCountries: {
+      // In exam mode the toggle selection is temporarily swapped to the exam
+      // list, so "Normal Mode" should reflect the user's real selection.
+      normal: (() => {
+        const src = $("#examModeInput").checked && savedCountriesBeforeExam
+          ? savedCountriesBeforeExam
+          : selectedCountries;
+        return (src.size > 0 && src.size < countryList.length)
+          ? [...src]
+          : countryList.map(c => c.id);
+      })(),
+      ranked: countryList.map(c => c.id),
+      exam: [...examCountryIds()]
+    },
     phase: "idle"
   };
 
@@ -993,6 +1031,9 @@ function startGame() {
   }
 
   startTotalTimer();
+
+  // Begin recording everything the player does this run.
+  startReplayRecording();
 
   // Reset interval UI
   $("#intervalSection").classList.add("hidden");
@@ -1043,6 +1084,7 @@ function startRankCountdown() {
     if (!game) return;
     if (i < steps.length) {
       text.textContent = steps[i];
+      replayRecord("countdown", { step: steps[i] });
       text.style.animation = "none";
       void text.offsetWidth; // restart the pop animation
       text.style.animation = "";
@@ -1056,6 +1098,7 @@ function startRankCountdown() {
       void text.offsetWidth;
       text.style.animation = "";
       playSound("go");
+      replayRecord("countdown", { step: "GO" });
       overlay.classList.add("hidden");
       text.style.color = "";
       text.style.textShadow = "";
@@ -1072,6 +1115,7 @@ function startRankCountdown() {
 function updateGuessesDisplay() {
   $("#guessesLeft").textContent = game.guessesLeft;
   $("#guessesLeft").style.color = game.guessesLeft === 1 ? "var(--warn)" : "var(--text)";
+  replayRecord("guess", { left: game.guessesLeft });
 }
 
 function showQuestion() {
@@ -1080,8 +1124,21 @@ function showQuestion() {
   game.guessesLeft = game.maxGuesses;
   updateGuessesDisplay();
 
-  // Clear answer circle markers from the previous question.
-  highlightG.selectAll("g.hl").remove();
+  // When the previous round's pulse is still animating into this one (pulse
+  // overlap), keep its rings on screen so they fade out naturally instead of
+  // being cut off instantly.
+  const preservePulse = !!game.pulseOverlap;
+  game.pulseOverlap = false;
+  if (!preservePulse) {
+    highlightG.selectAll("g.hl").remove();
+  } else {
+    // Let the ring pulse play out (~700ms), then fade the rings away.
+    const stale = highlightG.selectAll("g.hl");
+    setTimeout(() => {
+      stale.classed("fade-out", true);
+      setTimeout(() => stale.remove(), 500);
+    }, 750);
+  }
 
   $("#currencyBox").classList.toggle("code-only", !game.showFullName);
   if (game.showFullName) {
@@ -1093,7 +1150,7 @@ function showQuestion() {
   $("#progress").textContent = `${game.index + 1} / ${game.total}`;
 
   resetCountryClasses();
-  clearFlash();
+  if (!preservePulse) clearFlash();
   hideFeedback();
 
   // Cheat mode (local only): auto-circle the correct country for dev.
@@ -1101,6 +1158,8 @@ function showQuestion() {
 
   $("#guessBar").classList.remove("low");
   startGuessTimer();
+
+  replayRecord("question", { index: game.index });
 }
 
 // Streak bonus points per milestone (10, 20, 30, ...). Each additional
@@ -1120,11 +1179,11 @@ function resolveQuestion(clickedId) {
   // ---------- Time's up: fail the question ----------
   if (clickedId === null) {
     game.incorrect++;
-    // Rank: streak resets, no points.
-    if (game.rankMode) {
+    replayRecord("answer", { index: game.index, clickedId: null, correct: false });
+    // A missed question resets the streak in EVERY mode (casual + ranked).
+    if (game.streak > 0) {
       game.streak = 0;
       updateStreakPill();
-      $("#streakCount").textContent = 0;
     }
     finishQuestion(q);
     showFeedback("info", `⏰ Time's up! ${q.name} is used in: ${answerLabelFor(q)}`);
@@ -1136,6 +1195,7 @@ function resolveQuestion(clickedId) {
   // ---------- Correct guess ----------
   if (q.countries.includes(clickedId)) {
     game.correct++;
+    replayRecord("answer", { index: game.index, clickedId, correct: true });
     const shown = nameOf(clickedId);
 
     // Streak is tracked in EVERY mode (casual + ranked).
@@ -1188,13 +1248,16 @@ function resolveQuestion(clickedId) {
   // ---------- Wrong guess ----------
   markCountries([clickedId], "wrong");
   markCircles([clickedId], "wrong");
-  flashAnswer([clickedId], "wrong");
+  // If a pulse is already running (e.g. the previous answer's reveal bleeding
+  // into this round), let it finish instead of cutting it off mid-pulse.
+  if (!flashTimer) flashAnswer([clickedId], "wrong");
   playSound("wrong");
+  replayRecord("answer", { index: game.index, clickedId, correct: false });
 
-  if (game.rankMode) {
-    // Rank: a wrong guess resets the streak.
+  // A wrong guess resets the streak in EVERY mode (casual + ranked).
+  if (game.streak > 0) {
     game.streak = 0;
-    $("#streakCount").textContent = 0;
+    updateStreakPill();
   }
 
   game.guessesLeft--;
@@ -1229,6 +1292,7 @@ function finishQuestion(q) {
   markCountries(q.countries, "correct");
   markCircles(q.countries, "correct");
   flashAnswer(q.countries, "correct");
+  replayRecord("reveal", { index: game.index });
 
   // Always reveal the full currency name once the answer is in.
   $("#currencyBox").classList.remove("code-only");
@@ -1241,6 +1305,11 @@ function finishQuestion(q) {
     game.totalElapsed = performance.now() - game.totalStart;
     playSound("finish");
     startInterval(true);
+  } else if (game.pulse) {
+    // Pulse on: start the next round immediately while the answer pulse is
+    // still animating — the pulse fades out on its own, the clock keeps going.
+    game.pulseOverlap = true;
+    advanceInterval(false);
   } else {
     startInterval(false);
   }
@@ -1286,6 +1355,37 @@ function showResults() {
   $("#finalStreak").textContent = game.highestStreak || 0;
   streakStat.classList.remove("hidden");
 
+  // Enabled-country details: only the set that was actually active for this
+  // game (exam list in exam mode, all in ranked, the toggle selection in
+  // casual), grouped by continent.
+  const ec = game.enabledCountries || { normal: [], ranked: [], exam: [] };
+  const activeIds = game.examMode ? ec.exam : (game.rankMode ? ec.ranked : ec.normal);
+  const activeNames = activeIds.map(id => nameOf(id)).sort((a, b) => a.localeCompare(b));
+
+  const byCont = {};
+  activeIds.forEach(id => {
+    const cont = COUNTRY_CONTINENT[id] || "Other";
+    (byCont[cont] = byCont[cont] || []).push(id);
+  });
+
+  const contEl = $("#detailContinents");
+  contEl.innerHTML = "";
+  CONTINENT_ORDER.concat(["Other"]).forEach(cont => {
+    const ids = byCont[cont];
+    if (!ids || ids.length === 0) return;
+    const head = document.createElement("h4");
+    head.textContent = cont;
+    const names = document.createElement("p");
+    names.className = "detail-list";
+    names.textContent = ids.map(nameOf).sort((a, b) => a.localeCompare(b)).join(", ");
+    contEl.appendChild(head);
+    contEl.appendChild(names);
+  });
+
+  $("#detailCount").textContent = activeNames.length + " countries";
+  $("#resultsDetails").classList.add("hidden");
+  $("#detailsBtn").classList.remove("hidden");
+
   // Rank mode extra stats: rank box, fastest answer.
   const rankBox = $("#rankScoreBox");
   const fastestStat = $("#fastestStat");
@@ -1305,7 +1405,508 @@ function showResults() {
     fastestStat.classList.add("hidden");
   }
 
+  // Record the finished run so it can be downloaded as a replay.
+  replayRecord("result", {
+    score: game.score,
+    correct: game.correct,
+    incorrect: game.incorrect,
+    elapsed: game.totalElapsed || 0,
+    fastest: Number.isFinite(game.fastestAnswer) ? game.fastestAnswer : null,
+    highestStreak: game.highestStreak || 0
+  });
+  $("#downloadReplayBtn").classList.toggle("hidden", !replayRec);
+
   showScreen("results");
+}
+
+// ================= Replay: recording =================
+// Every run is recorded: cursor position (throttled), map zoom/pan, question
+// changes, score/streak/guesses, answers and the final results. The recording
+// can be downloaded from the results screen and replayed.
+let replayRec = null;         // active recording { events, meta, t0 }
+let replayLastPointer = 0;    // throttle timestamp for pointer events
+let replayLastZoom = 0;       // throttle timestamp for zoom events
+
+function startReplayRecording() {
+  if (!game) return;
+  replayRec = {
+    meta: {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      mode: game.rankMode ? "ranked" : "casual",
+      settings: {
+        rankMode: game.rankMode,
+        examMode: game.examMode,
+        playerName: game.playerName,
+        guessMs: game.guessMs,
+        intervalMs: game.intervalMs,
+        maxGuesses: game.maxGuesses,
+        snapRadiusKm: game.snapRadiusKm,
+        showFullName: game.showFullName,
+        showCountryNames: game.showCountryNames,
+        pulse: game.pulse,
+        enabledCountries: game.enabledCountries
+      },
+      questions: game.questions.map(q => ({ code: q.code, name: q.name, symbol: q.symbol, countries: q.countries }))
+    },
+    events: [],
+    t0: performance.now()
+  };
+  replayLastPointer = 0;
+  replayLastZoom = 0;
+}
+
+function replayRecord(type, data) {
+  if (!replayRec) return;
+  replayRec.events.push({ t: Math.round(performance.now() - replayRec.t0), type, data });
+}
+
+function replayRecordPointer(x, y) {
+  if (!replayRec) return;
+  const now = performance.now();
+  if (now - replayLastPointer < 16) return;   // ~60 samples/sec
+  replayLastPointer = now;
+  replayRecord("pointer", { x, y });
+}
+
+function replayRecordZoom() {
+  if (!replayRec) return;
+  const now = performance.now();
+  if (now - replayLastZoom < 80) return;      // ~12 samples/sec
+  replayLastZoom = now;
+  const z = currentZoom || d3.zoomIdentity;
+  replayRecord("zoom", { x: z.x, y: z.y, k: z.k });
+}
+
+function stopReplayRecording() {
+  replayRec = null;
+}
+
+// ================= Replay: playback =================
+// Playback drives the map, HUD and results from a saved recording file.
+let replayPlay = null;        // { events, idx, t0, meta, mode }
+let replayCursorEl = null;    // div shown at the recorded pointer position
+let replayRafId = null;
+let replayGuessTimerId = null;   // counts the guess bar down during a question
+let replayGuessDeadline = 0;
+
+function replayStartGuessTimer() {
+  if (replayGuessTimerId) clearInterval(replayGuessTimerId);
+  replayGuessDeadline = performance.now() + game.guessMs;
+  $("#guessBar").classList.remove("low");
+  $("#guessBar").style.width = "100%";
+  replayGuessTimerId = setInterval(() => {
+    const remain = replayGuessDeadline - performance.now();
+    if (remain <= 0) {
+      clearInterval(replayGuessTimerId);
+      replayGuessTimerId = null;
+      $("#guessTimeLeft").textContent = "0.0s";
+      $("#guessBar").style.width = "0%";
+      $("#guessBar").classList.add("low");
+      return;
+    }
+    $("#guessTimeLeft").textContent = (remain / 1000).toFixed(1) + "s";
+    $("#guessBar").style.width = (remain / game.guessMs * 100) + "%";
+    $("#guessBar").classList.toggle("low", remain / game.guessMs < 0.25);
+  }, 50);
+}
+
+function replayStopGuessTimer() {
+  if (replayGuessTimerId) { clearInterval(replayGuessTimerId); replayGuessTimerId = null; }
+}
+
+function replayCursor() {
+  if (replayCursorEl) return replayCursorEl;
+  const wrapper = document.querySelector(".map-wrapper");
+  if (!wrapper) return null;
+  replayCursorEl = document.createElement("div");
+  replayCursorEl.className = "replay-cursor";
+  wrapper.appendChild(replayCursorEl);
+  return replayCursorEl;
+}
+
+function replayMoveCursor(x, y) {
+  const c = replayCursor();
+  if (!c) return;
+  c.style.left = x + "px";
+  c.style.top = y + "px";
+}
+
+function replayRemoveCursor() {
+  if (replayCursorEl) {
+    replayCursorEl.remove();
+    replayCursorEl = null;
+  }
+}
+
+// Parse a replay file and start playing it.
+function startReplay(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(reader.result); }
+    catch (e) { showToast("⚠ Invalid replay file", false); return; }
+    if (!data || !Array.isArray(data.events) || !data.meta) {
+      showToast("⚠ Not a currency-game replay", false);
+      return;
+    }
+    runReplay(data);
+  };
+  reader.readAsText(file);
+}
+
+// Build a fake game from the replay's meta so the existing HUD/map render
+// helpers work unchanged, then step through the events on a timeline.
+function runReplay(data) {
+  stopReplay();
+  const m = data.meta;
+  const settings = m.settings || {};
+
+  // Cancel any live game timers and hide the results detail panel.
+  if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); clearTimer(game.countdownTimerId); }
+  stopTotalTimer();
+  $("#countdownOverlay").classList.add("hidden");
+
+  game = {
+    questions: (m.questions || []).map(q => ({ ...q })),
+    total: (m.questions || []).length,
+    index: 0,
+    score: 0,
+    previousScore: 0,
+    correct: 0,
+    incorrect: 0,
+    guessMs: settings.guessMs || 7000,
+    intervalMs: settings.intervalMs || 0,
+    maxGuesses: settings.maxGuesses || 1,
+    snapRadiusKm: settings.snapRadiusKm || 0,
+    showFullName: settings.showFullName !== false,
+    showCountryNames: settings.showCountryNames !== false,
+    tapSelect: false,
+    // Always show the answer pulse + rings during replay so it looks like the
+    // live game did.
+    pulse: true,
+    rankMode: !!settings.rankMode,
+    examMode: !!settings.examMode,
+    playerName: settings.playerName || "",
+    streak: 0,
+    highestStreak: 0,
+    totalSpeedBonus: 0,
+    totalStreakBonus: 0,
+    fastestAnswer: Infinity,
+    answerTimes: [],
+    enabledCountries: settings.enabledCountries || { normal: [], ranked: [], exam: [] },
+    totalStart: performance.now(),
+    totalTimerId: null,
+    guessTimerId: null,
+    intervalTimerId: null,
+    countdownTimerId: null,
+    phase: "replay"
+  };
+
+  showScreen("game");
+  resetGameScreen();
+  // Replays play sounds too; the menu may have suspended the audio context.
+  soundsEnabled = true;
+  ensureAudio();
+  // Ensure the pulse rings aren't disabled by a leftover no-pulse body class.
+  setPulse(true);
+  $("#streakPill").classList.remove("hidden");
+  $("#streakMult").classList.toggle("hidden", !game.rankMode);
+  requestAnimationFrame(() => requestAnimationFrame(resizeMap));
+  if (zoomBehavior && svg) svg.call(zoomBehavior.transform, d3.zoomIdentity);
+  $("#intervalSection").classList.add("hidden");
+  $("#guessBar").classList.remove("low");
+  $("#guessBar").style.width = "100%";
+  $("#currencyBox").classList.toggle("code-only", !game.showFullName);
+  hideFeedback();
+  replayRemoveCursor();
+
+  replayPlay = {
+    events: data.events.slice().sort((a, b) => a.t - b.t),
+    idx: 0,
+    t0: performance.now(),
+    ended: false,
+    totalMs: data.events.length
+      ? data.events[data.events.length - 1].t
+      : 0
+  };
+
+  showReplayControls();
+  initReplayTimeline();
+  replayStep();
+}
+
+// Set up the timeline scrubber for this recording.
+function initReplayTimeline() {
+  const bar = $("#replaySeek");
+  const tl = $("#replayTimeline");
+  if (!bar || !tl) return;
+  const totalMs = replayPlay ? replayPlay.totalMs : 0;
+  bar.max = Math.max(1, Math.round(totalMs));
+  bar.value = 0;
+  $("#replayTimeCur").textContent = "0:00";
+  $("#replayTimeTotal").textContent = fmtReplayTime(totalMs);
+  tl.classList.remove("hidden");
+}
+
+function fmtReplayTime(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  const m = Math.floor(s / 60);
+  return m + ":" + String(s % 60).padStart(2, "0");
+}
+
+// Update the scrubber position as the replay advances.
+function updateReplayTimeline(now) {
+  const bar = $("#replaySeek");
+  if (!bar || !replayPlay) return;
+  bar.value = Math.min(bar.max, Math.round(now));
+  $("#replayTimeCur").textContent = fmtReplayTime(now);
+}
+
+// Jump the replay to a specific elapsed time, re-applying all events up to it.
+function replaySeekTo(targetMs) {
+  if (!replayPlay) return;
+  replayPlay.t0 = performance.now() - targetMs;
+  replayPlay.idx = 0;
+  replayPlay.ended = false;
+
+  // Reset visual state so re-applying events is deterministic.
+  if (highlightG) highlightG.selectAll("g.hl").remove();
+  resetCountryClasses();
+  clearFlash();
+  replayStopGuessTimer();
+  hideFeedback();
+  $("#countdownOverlay").classList.add("hidden");
+  game.score = 0;
+  game.correct = 0;
+  game.incorrect = 0;
+  game.streak = 0;
+  game.highestStreak = 0;
+  game.index = 0;
+  $("#score").textContent = "0";
+  $("#streakCount").textContent = "0";
+  $("#progress").textContent = `1 / ${game.total}`;
+
+  // Re-apply every event that happens at or before the target time.
+  const prevSound = soundsEnabled;
+  soundsEnabled = false;   // don't blast the audio while scrubbing
+  let guard = 0;
+  while (replayPlay.idx < replayPlay.events.length &&
+         replayPlay.events[replayPlay.idx].t <= targetMs &&
+         guard < 100000) {
+    applyReplayEvent(replayPlay.events[replayPlay.idx]);
+    replayPlay.idx++;
+    guard++;
+  }
+  soundsEnabled = prevSound;
+
+  updateReplayTimeline(targetMs);
+
+  // Continue playing from the seeked position (skip the trailing event check).
+  if (replayRafId) cancelAnimationFrame(replayRafId);
+  replayRafId = null;
+  replayStep();
+}
+
+// rAF driver: fire every event whose timestamp has passed.
+function replayStep() {
+  if (!replayPlay) return;
+  if (replayPlay.ended) {
+    cancelAnimationFrame(replayRafId);
+    replayRafId = null;
+    finishReplay();
+    return;
+  }
+  const now = performance.now() - replayPlay.t0;
+  updateReplayTimeline(now);
+  let guard = 0;
+  while (replayPlay.idx < replayPlay.events.length && replayPlay.events[replayPlay.idx].t <= now && guard < 5000) {
+    applyReplayEvent(replayPlay.events[replayPlay.idx]);
+    replayPlay.idx++;
+    guard++;
+  }
+  if (replayPlay.ended || replayPlay.idx >= replayPlay.events.length) {
+    finishReplay();
+    return;
+  }
+  replayRafId = requestAnimationFrame(replayStep);
+}
+
+function applyReplayEvent(ev) {
+  const d = ev.data || {};
+  switch (ev.type) {
+    case "pointer":
+      replayMoveCursor(d.x, d.y);
+      break;
+    case "zoom": {
+      const z = d3.zoomIdentity.translate(d.x, d.y).scale(d.k);
+      currentZoom = z;
+      if (mapG) mapG.attr("transform", z);
+      renderLabels();
+      break;
+    }
+    case "countdown": {
+      const ov = $("#countdownOverlay");
+      const txt = $("#countdownText");
+      if (d.step === "GO") {
+        ov.classList.add("hidden");
+        txt.style.color = "";
+        txt.style.textShadow = "";
+        playSound("go");
+      } else {
+        ov.classList.remove("hidden");
+        txt.textContent = d.step;
+        txt.style.color = "";
+        txt.style.textShadow = "";
+        playSound("countdown");
+      }
+      break;
+    }
+    case "question": {
+      game.index = d.index;
+      const q = game.questions[d.index];
+      if (q) {
+        game.phase = "question";
+        game.guessesLeft = game.maxGuesses;
+        // When the previous round's pulse is still animating into this one
+        // (reveal recorded right before this question), keep its rings so they
+        // fade out naturally instead of being cut off instantly.
+        const preservePulse = !!flashTimer;
+        if (highlightG) {
+          if (!preservePulse) {
+            highlightG.selectAll("g.hl").remove();
+          } else {
+            const stale = highlightG.selectAll("g.hl");
+            setTimeout(() => {
+              stale.classed("fade-out", true);
+              setTimeout(() => stale.remove(), 500);
+            }, 750);
+          }
+        }
+        updateGuessesDisplay();
+        $("#currencyBox").classList.toggle("code-only", !game.showFullName);
+        $("#currencyName").textContent = game.showFullName ? q.name : q.code;
+        $("#currencySymbol").textContent = q.symbol ? `${q.symbol}   ·   ${q.code}` : q.code;
+        $("#progress").textContent = `${d.index + 1} / ${game.total}`;
+        resetCountryClasses();
+        if (!preservePulse) clearFlash();
+        hideFeedback();
+        $("#intervalSection").classList.add("hidden");
+        replayStartGuessTimer();
+      }
+      break;
+    }
+    case "guess":
+      game.guessesLeft = d.left;
+      updateGuessesDisplay();
+      break;
+    case "streak":
+      game.streak = d.value;
+      if (d.value > game.highestStreak) game.highestStreak = d.value;
+      updateStreakPill();
+      break;
+    case "score":
+      game.score = d.value;
+      $("#score").textContent = d.value;
+      break;
+    case "answer": {
+      const q = game.questions[game.index];
+      if (!q) break;
+      replayStopGuessTimer();
+      if (d.correct) {
+        game.correct++;
+        playSound("correct");
+        markCountries(q.countries, "correct");
+        markCircles(q.countries, "correct");
+        flashAnswer(q.countries, "correct");
+      } else if (d.clickedId !== null) {
+        game.incorrect++;
+        playSound("wrong");
+        markCountries([d.clickedId], "wrong");
+        markCircles([d.clickedId], "wrong");
+        flashAnswer([d.clickedId], "wrong");
+      } else {
+        game.incorrect++;
+        playSound("timeout");
+      }
+      break;
+    }
+    case "reveal": {
+      const q = game.questions[d.index];
+      if (!q) break;
+      replayStopGuessTimer();
+      game.phase = "answered";
+      markCountries(q.countries, "correct");
+      markCircles(q.countries, "correct");
+      flashAnswer(q.countries, "correct");
+      $("#currencyBox").classList.remove("code-only");
+      $("#currencyName").textContent = q.name;
+      break;
+    }
+    case "feedback":
+      if (d.kind) showFeedback(d.kind, d.msg || "");
+      break;
+    case "interval": {
+      replayStopGuessTimer();
+      if (d.final) break;
+      $("#intervalSection").classList.remove("hidden");
+      $("#intervalLabel").textContent = "➡ Next question";
+      const dur = d.duration || 0;
+      $("#intervalLeft").textContent = (dur / 1000).toFixed(1) + "s";
+      $("#intervalBar").style.width = "0%";
+      break;
+    }
+    case "result": {
+      // The run ended; carry the recorded stats into the fake game so the
+      // results screen shows exactly what the original player saw.
+      game.score = d.score || 0;
+      game.correct = d.correct || 0;
+      game.incorrect = d.incorrect || 0;
+      game.totalElapsed = d.elapsed || 0;
+      game.fastestAnswer = (d.fastest == null) ? Infinity : d.fastest;
+      game.highestStreak = d.highestStreak || 0;
+      game.phase = "done";
+      replayPlay.ended = true;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+function finishReplay() {
+  if (!replayPlay) return;
+  const q = game.questions[game.index];
+  if (q) { $("#currencyName").textContent = q.name; }
+  replayRemoveCursor();
+  stopReplay();
+  showResults();
+}
+
+function stopReplay() {
+  if (replayRafId) cancelAnimationFrame(replayRafId);
+  replayRafId = null;
+  replayStopGuessTimer();
+  replayPlay = null;
+  $("#replayTimeline").classList.add("hidden");
+  replayRemoveCursor();
+}
+
+// ================= Replay: UI =================
+function showReplayControls() {
+  // Hide the Stop button's normal purpose during replay is fine; just ensure
+  // the results details panel is hidden until the run ends.
+  $("#resultsDetails").classList.add("hidden");
+}
+
+function downloadReplay() {
+  if (!replayRec) return;
+  const blob = new Blob([JSON.stringify(replayRec, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `currency-replay-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
 // ================= Error reporting (visible on screen) =================
@@ -1424,12 +2025,31 @@ function applyRankMenuState() {
 }
 
 // ================= Settings overlay (categorized) =================
-// Interval Time is visually disabled whenever Interval Wait is off.
+// Interval Time is visually disabled whenever Interval Wait is off. The Pulse
+// Answer Colors toggle is the reverse: it's only usable when Interval Wait is
+// off — enabling the wait force-unchecks it, and turning the wait off restores
+// the user's previous pulse choice.
 function syncIntervalState() {
   const on = $("#intervalToggleInput").checked;
   const t = $("#intervalTimeInput");
   t.disabled = !on;
   t.classList.toggle("locked", !on);
+  const p = $("#pulseToggleInput");
+  p.disabled = on;
+  p.classList.toggle("locked", on);
+  // Remember the user's choice when the toggle gets locked, restore it after.
+  if (on) {
+    if (p.dataset.pref === undefined) p.dataset.pref = p.checked ? "1" : "0";
+    p.checked = false;
+  } else {
+    if (p.dataset.pref !== undefined) {
+      p.checked = p.dataset.pref === "1";
+      delete p.dataset.pref;
+    }
+  }
+  // The "unavailable" notice only belongs while the pulse option is locked.
+  $("#pulseNote").classList.toggle("hidden", !on);
+  setPulse(p.checked);
 }
 
 // Show only the selected category's settings section + highlight its nav item.
@@ -1632,14 +2252,44 @@ function setAllCountries(on) {
   updateContinentCounts();
 }
 
-// When 📚 Exam mode is ON, the Country toggle is ignored and disabled.
+// Country ids covered by 📚 Exam mode (the countries used by EXAM_CURRENCIES).
+let savedCountriesBeforeExam = null;
+
+function examCountryIds() {
+  const examSet = new Set(EXAM_CURRENCIES);
+  const ids = new Set();
+  CURRENCIES.forEach(c => {
+    if (examSet.has(c.code)) c.countries.forEach(id => ids.add(id));
+  });
+  return ids;
+}
+
+// When 📚 Exam mode is ON, the Country toggle is ignored and disabled, and its
+// selection is switched to match the exam list. Turning it OFF restores the
+// selection the user had before.
 function syncCountriesState() {
-  const disabled = $("#examModeInput").checked;
+  const examOn = $("#examModeInput").checked;
+  if (examOn) {
+    if (savedCountriesBeforeExam === null) {
+      savedCountriesBeforeExam = new Set(selectedCountries);
+    }
+    selectedCountries.clear();
+    examCountryIds().forEach(id => selectedCountries.add(id));
+  } else if (savedCountriesBeforeExam !== null) {
+    selectedCountries.clear();
+    savedCountriesBeforeExam.forEach(id => selectedCountries.add(id));
+    savedCountriesBeforeExam = null;
+  }
+  renderCountryList();
+
+  const disabled = examOn;
   document.querySelectorAll("#countryList input").forEach(cb => { cb.disabled = disabled; });
   $("#countrySearch").disabled = disabled;
   $("#countryAllBtn").disabled = disabled;
   $("#countryNoneBtn").disabled = disabled;
   $("#countriesDisabledNote").classList.toggle("hidden", !disabled);
+
+  saveSettings();
 }
 
 // Generic overlay open/close with a short fade/slide animation.
@@ -1765,9 +2415,23 @@ function resetDefaults() {
 
 // Return to the main menu, always in the normal (non-rank) state.
 function goToMenu() {
-  if (game) { clearTimer(game.guessTimerId); clearTimer(game.intervalTimerId); clearTimer(game.countdownTimerId); }
+  stopReplay();
+  stopReplayRecording();
+  // Fully stop the running game: timers, pulse flash, score tween, and audio.
+  if (game) {
+    clearTimer(game.guessTimerId);
+    clearTimer(game.intervalTimerId);
+    clearTimer(game.countdownTimerId);
+    game.phase = "done";
+  }
   stopTotalTimer();
+  clearFlash();
+  if (scoreAnimFrame) { cancelAnimationFrame(scoreAnimFrame); scoreAnimFrame = null; }
+  $("#scorePop").classList.add("hidden");
+  // Silence any in-flight WebAudio tones/oscillators.
+  if (audioCtx) audioCtx.suspend().catch(() => {});
   $("#countdownOverlay").classList.add("hidden");
+  if (highlightG) highlightG.selectAll("g.hl").remove();
   if (zoomBehavior && svg) {
     svg.call(zoomBehavior.transform, d3.zoomIdentity);
   }
@@ -2126,6 +2790,19 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#settingsCloseBtn").addEventListener("click", closeSettings);
   $("#settingsDoneBtn").addEventListener("click", closeSettings);
   $("#resetBtn").addEventListener("click", resetDefaults);
+
+  // Replay: load a recorded run from a file.
+  $("#replayBtn").addEventListener("click", () => $("#replayFileInput").click());
+  $("#replayFileInput").addEventListener("change", e => {
+    const file = e.target.files && e.target.files[0];
+    if (file) startReplay(file);
+    e.target.value = "";
+  });
+  $("#downloadReplayBtn").addEventListener("click", downloadReplay);
+  // Replay timeline scrubber: dragging jumps the replay to that time.
+  $("#replaySeek").addEventListener("input", e => {
+    if (replayPlay) replaySeekTo(parseFloat(e.target.value));
+  });
   document.querySelectorAll(".cat-btn").forEach(btn => {
     btn.addEventListener("click", () => selectCategory(btn.dataset.cat));
   });
@@ -2158,6 +2835,9 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#playAgainBtn").addEventListener("click", startGame);
   $("#stopBtn").addEventListener("click", goToMenu);
   $("#mainMenuBtn").addEventListener("click", goToMenu);
+  $("#detailsBtn").addEventListener("click", () => {
+    $("#resultsDetails").classList.toggle("hidden");
+  });
   $("#resetViewBtn").addEventListener("click", () => {
     if (zoomBehavior && svg) {
       svg.transition().duration(300).call(zoomBehavior.transform, d3.zoomIdentity);
