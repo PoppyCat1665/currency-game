@@ -816,10 +816,11 @@ function startGame() {
     questions = questions.filter(c => examSet.has(c.code));
   }
   questions = shuffle(questions);
-  // Rounds: ranked uses the chosen rank mode (50/70/100/all); casual uses the
-  // Rounds setting.
+  // Rounds: if ranked WITH Exam mode on, just use the full exam list
+  // (EXAM_COUNT rounds). Otherwise ranked uses the chosen rank mode
+  // (50/70/100/all); casual uses the Rounds setting.
   const roundsRequested = rankMode
-    ? (pendingRankRounds === "all" ? questions.length : pendingRankRounds)
+    ? (examMode ? questions.length : (pendingRankRounds === "all" ? questions.length : pendingRankRounds))
     : Math.max(1, parseInt($("#roundsInput").value, 10) || (examMode ? EXAM_COUNT : 40));
   const rounds = Math.min(roundsRequested, questions.length);
   questions = questions.slice(0, rounds);
