@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Currency Guessing Game</title>
-  <link rel="stylesheet" href="styles.css?v=30">
+  <link rel="stylesheet" href="styles.css?v=31">
 </head>
 <body>
 
@@ -26,7 +26,7 @@
 
       <p class="hint">You'll be shown a currency – click the country that uses it before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v3.9</p>
+      <p class="version" id="appVersion">v4.0</p>
     </div>
   </div>
 
@@ -56,30 +56,30 @@
             <h3>Gameplay</h3>
             <label class="setting">
               <span>Guess Time</span>
-              <span class="info-icon" title="Fixed in Ranked mode">ⓘ</span>
+              <span class="info-icon" title="Ranked: fixed at 5s">ⓘ</span>
               <input id="guessTimeInput" type="number" min="1" max="30" step="1" value="7">
               <span class="unit">seconds</span>
             </label>
             <label class="setting toggle">
               <span>Interval Wait</span>
-              <span class="info-icon" title="Fixed in Ranked mode">ⓘ</span>
+              <span class="info-icon" title="Ranked: fixed OFF">ⓘ</span>
               <input id="intervalToggleInput" type="checkbox" checked>
             </label>
             <label class="setting">
               <span>Interval Time</span>
-              <span class="info-icon" title="Fixed in Ranked mode">ⓘ</span>
+              <span class="info-icon" title="Ranked: fixed at 0s (off)">ⓘ</span>
               <input id="intervalTimeInput" type="number" min="0" max="10" step="1" value="3">
               <span class="unit">seconds</span>
             </label>
             <label class="setting">
               <span>Max Guesses</span>
-              <span class="info-icon" title="Fixed in Ranked mode">ⓘ</span>
+              <span class="info-icon" title="Ranked: fixed at 1">ⓘ</span>
               <input id="maxGuessesInput" type="number" min="1" max="10" step="1" value="1">
               <span class="unit">per question</span>
             </label>
             <label class="setting">
               <span>Rounds</span>
-              <span class="info-icon" title="Fixed in Ranked mode">ⓘ</span>
+              <span class="info-icon" title="Ranked: fixed by your rank mode pick (50/70/100/All)">ⓘ</span>
               <input id="roundsInput" type="number" min="1" max="235" step="1" value="40">
               <span class="unit">questions</span>
             </label>
@@ -89,12 +89,12 @@
             <h3>Display</h3>
             <label class="setting toggle">
               <span>Show Full Currency Name</span>
-              <span class="info-icon" title="Fixed in Ranked mode">ⓘ</span>
+              <span class="info-icon" title="Ranked: fixed OFF (shows code only)">ⓘ</span>
               <input id="showFullNameInput" type="checkbox" checked>
             </label>
             <label class="setting toggle">
               <span>Show Country Names on Map</span>
-              <span class="info-icon" title="Fixed in Ranked mode">ⓘ</span>
+              <span class="info-icon" title="Ranked: fixed OFF">ⓘ</span>
               <input id="showCountryNamesInput" type="checkbox" checked>
             </label>
           </section>
@@ -103,7 +103,7 @@
             <h3>Map</h3>
             <label class="setting">
               <span>Click Radius</span>
-              <span class="info-icon" title="Fixed in Ranked mode">ⓘ</span>
+              <span class="info-icon" title="Ranked: fixed at 250km">ⓘ</span>
               <input id="snapRadiusInput" type="number" min="0" max="1000" step="10" value="1000">
               <span class="unit">km</span>
             </label>
@@ -282,10 +282,10 @@
     </div>
   </div>
 
-  <script src="lib/d3.min.js?v=30"></script>
-  <script src="lib/topojson.min.js?v=30"></script>
-  <script src="lib/world.js?v=30"></script>
-  <script src="data.js?v=30"></script>
-  <script src="game.js?v=30"></script>
+  <script src="lib/d3.min.js?v=31"></script>
+  <script src="lib/topojson.min.js?v=31"></script>
+  <script src="lib/world.js?v=31"></script>
+  <script src="data.js?v=31"></script>
+  <script src="game.js?v=31"></script>
 </body>
 </html>
