@@ -785,12 +785,37 @@ function skipInterval() {
   return true;
 }
 
+// How long the answer pulse is shown before auto-advancing when interval wait
+// is OFF (instant skip), so the correct/wrong flash is actually visible.
+const INSTANT_REVEAL_MS = 700;
+
 function startInterval(isFinal) {
   clearTimer(game.intervalTimerId);
+
+  // Instant skip (interval OFF): hold the reveal just long enough for the
+  // answer flash to be seen, without the interval bar. Clicking still skips.
+  const dur = game.intervalMs;
+  if (dur <= 0) {
+    if (!isFinal) {
+      $("#intervalSection").classList.add("hidden");
+      const deadline = performance.now() + INSTANT_REVEAL_MS;
+      const flash = () => {
+        if (performance.now() >= deadline) {
+          clearTimer(game.intervalTimerId);
+          advanceInterval(false);
+          return;
+        }
+      };
+      game.intervalTimerId = setInterval(flash, 40);
+      return;
+    }
+    advanceInterval(true);
+    return;
+  }
+
   $("#intervalSection").classList.remove("hidden");
   $("#intervalLabel").textContent = isFinal ? "🎉 Showing results" : "➡ Next question";
 
-  const dur = game.intervalMs;
   let deadline = performance.now() + dur;
 
   const tick = () => {
@@ -802,11 +827,6 @@ function startInterval(isFinal) {
     $("#intervalLeft").textContent = (remain / 1000).toFixed(1) + "s";
     $("#intervalBar").style.width = ((dur - remain) / dur * 100) + "%";
   };
-
-  if (dur <= 0) {
-    advanceInterval(isFinal);
-    return;
-  }
 
   $("#intervalLeft").textContent = (dur / 1000).toFixed(1) + "s";
   $("#intervalBar").style.width = "0%";
