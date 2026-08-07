@@ -1037,6 +1037,17 @@ body.rank-active .credit { color: #a06a6a; }
 
 .setting-note { font-size: 12px; color: var(--muted); line-height: 1.5; }
 
+/* Little "i" info icon on settings that are fixed/locked in Ranked mode. */
+.info-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 15px;
+  cursor: help;
+  opacity: 0.75;
+  user-select: none;
+}
+.info-icon:hover { opacity: 1; color: var(--accent); }
+
 .settings-footer {
   display: flex;
   justify-content: space-between;

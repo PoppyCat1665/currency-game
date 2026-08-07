@@ -1439,6 +1439,16 @@ function setAllCountries(on) {
   saveSettings();
 }
 
+// When 📚 Exam mode is ON, the Country toggle is ignored and disabled.
+function syncCountriesState() {
+  const disabled = $("#examModeInput").checked;
+  document.querySelectorAll("#countryList input").forEach(cb => { cb.disabled = disabled; });
+  $("#countrySearch").disabled = disabled;
+  $("#countryAllBtn").disabled = disabled;
+  $("#countryNoneBtn").disabled = disabled;
+  $("#countriesDisabledNote").classList.toggle("hidden", !disabled);
+}
+
 // Generic overlay open/close with a short fade/slide animation.
 function openOverlay(id) {
   const ov = $(id);
@@ -1542,6 +1552,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   $("#countryAllBtn").addEventListener("click", () => setAllCountries(true));
   $("#countryNoneBtn").addEventListener("click", () => setAllCountries(false));
+  // Exam mode disables the country toggle.
+  syncCountriesState();
+  $("#examModeInput").addEventListener("change", syncCountriesState);
 
   // Mode buttons: PLAY = casual, RANKED = rank mode.
   $("#playBtn").addEventListener("click", () => {
