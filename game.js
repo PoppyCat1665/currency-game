@@ -1237,7 +1237,7 @@ function applyRankMenuState() {
     intervalTime.disabled = true;
     intervalTime.value = 0;
     fullName.checked = false;        // rank hides full currency names
-    countryNames.checked = true;     // rank always shows country names
+    countryNames.checked = false;    // rank hides country names (harder)
     nameInput.placeholder = "Your name… (shown in rank mode)";
     // Lock every option input so the player can't change them mid-rank.
     settingsToLock.forEach(id => {
