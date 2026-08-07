@@ -1045,8 +1045,30 @@ body.rank-active .credit { color: #a06a6a; }
   cursor: help;
   opacity: 0.75;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .info-icon:hover { opacity: 1; color: var(--accent); }
+
+/* Floating info tooltip shown on hover (desktop) or tap (touch/iPad). */
+.info-tip {
+  position: fixed;
+  z-index: 200;
+  max-width: 240px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #0d1530;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: normal;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 6px));
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.info-tip.show { opacity: 1; }
 
 .settings-footer {
   display: flex;
@@ -1087,6 +1109,16 @@ body.rank-active .credit { color: #a06a6a; }
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
 }
+.country-continent {
+  grid-column: 1 / -1;
+  margin: 6px 0 2px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.country-continent:first-child { margin-top: 0; }
 .country-toggle {
   display: flex;
   align-items: center;

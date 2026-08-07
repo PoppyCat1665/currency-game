@@ -1,4 +1,4 @@
-/* global d3, topojson, WORLD_TOPOJSON, CURRENCIES, EXAM_CURRENCIES */
+/* global d3, topojson, WORLD_TOPOJSON, CURRENCIES, EXAM_CURRENCIES, COUNTRY_CONTINENT */
 
 "use strict";
 
@@ -1407,29 +1407,58 @@ function initSelectedCountries() {
   }
 }
 
+// Build one toggle row for a country.
+function makeCountryRow(c) {
+  const label = document.createElement("label");
+  label.className = "country-toggle";
+  label.dataset.name = c.name.toLowerCase();
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = selectedCountries.has(c.id);
+  cb.dataset.id = c.id;
+  cb.addEventListener("change", () => {
+    if (cb.checked) selectedCountries.add(c.id);
+    else selectedCountries.delete(c.id);
+    saveSettings();
+  });
+  const span = document.createElement("span");
+  span.textContent = c.name;
+  label.appendChild(cb);
+  label.appendChild(span);
+  return label;
+}
+
+const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Antarctica"];
+
 function renderCountryList() {
   const container = $("#countryList");
   if (!container) return;
   container.innerHTML = "";
+
+  // Group countries by continent (from COUNTRY_CONTINENT), keeping name order.
+  const groups = {};
   countryList.forEach(c => {
-    const label = document.createElement("label");
-    label.className = "country-toggle";
-    label.dataset.name = c.name.toLowerCase();
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = selectedCountries.has(c.id);
-    cb.dataset.id = c.id;
-    cb.addEventListener("change", () => {
-      if (cb.checked) selectedCountries.add(c.id);
-      else selectedCountries.delete(c.id);
-      saveSettings();
-    });
-    const span = document.createElement("span");
-    span.textContent = c.name;
-    label.appendChild(cb);
-    label.appendChild(span);
-    container.appendChild(label);
+    const cont = COUNTRY_CONTINENT[c.id] || "Other";
+    (groups[cont] = groups[cont] || []).push(c);
   });
+
+  CONTINENT_ORDER.forEach(cont => {
+    if (!groups[cont] || groups[cont].length === 0) return;
+    const head = document.createElement("div");
+    head.className = "country-continent";
+    head.textContent = cont;
+    container.appendChild(head);
+    groups[cont].forEach(c => container.appendChild(makeCountryRow(c)));
+    delete groups[cont];
+  });
+  // Any ungrouped fall into "Other" at the end.
+  if (groups.Other && groups.Other.length) {
+    const head = document.createElement("div");
+    head.className = "country-continent";
+    head.textContent = "Other";
+    container.appendChild(head);
+    groups.Other.forEach(c => container.appendChild(makeCountryRow(c)));
+  }
 }
 
 function setAllCountries(on) {
@@ -1518,9 +1547,57 @@ function goToMenu() {
   showScreen("menu");
 }
 
+// ================= Info "i" tooltips =================
+// Desktop shows the ⓘ tip on hover; touch devices (iPad/tablet) show it on tap
+// and dismiss on a second tap or tapping elsewhere.
+function initInfoTips() {
+  const tip = document.createElement("div");
+  tip.className = "info-tip";
+  document.body.appendChild(tip);
+
+  const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
+
+  const show = icon => {
+    const r = icon.getBoundingClientRect();
+    tip.textContent = icon.getAttribute("data-info") || "";
+    tip.style.left = (r.left + r.width / 2) + "px";
+    tip.style.top = r.top + "px";
+    tip.classList.add("show");
+  };
+  const hide = () => tip.classList.remove("show");
+
+  if (!IS_TOUCH) {
+    document.addEventListener("mouseover", e => {
+      const ic = e.target.closest && e.target.closest(".info-icon");
+      if (ic) show(ic);
+    });
+    document.addEventListener("mouseout", e => {
+      if (e.target.closest && e.target.closest(".info-icon")) hide();
+    });
+  } else {
+    document.addEventListener("click", e => {
+      const ic = e.target.closest && e.target.closest(".info-icon");
+      if (ic) {
+        e.preventDefault();
+        if (tip.classList.contains("show") && tip.dataset.for === ic.getAttribute("data-info")) {
+          hide();
+          tip.dataset.for = "";
+        } else {
+          show(ic);
+          tip.dataset.for = ic.getAttribute("data-info");
+        }
+      } else {
+        hide();
+        tip.dataset.for = "";
+      }
+    }, true);
+  }
+}
+
 // ================= Wire up UI =================
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
+  initInfoTips();
 
   // Restore persisted settings (needs countryList built by initMap), then
   // render the country toggles and apply menu state.
@@ -1548,6 +1625,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const q = e.target.value.toLowerCase();
     document.querySelectorAll(".country-toggle").forEach(row => {
       row.style.display = row.dataset.name.includes(q) ? "" : "none";
+    });
+    // Hide continent headings that have no visible countries.
+    document.querySelectorAll(".country-continent").forEach(head => {
+      let visible = 0;
+      let el = head.nextElementSibling;
+      while (el && !el.classList.contains("country-continent")) {
+        if (el.style.display !== "none") visible++;
+        el = el.nextElementSibling;
+      }
+      head.style.display = visible ? "" : "none";
     });
   });
   $("#countryAllBtn").addEventListener("click", () => setAllCountries(true));
