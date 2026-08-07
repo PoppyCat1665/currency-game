@@ -150,3 +150,13 @@ const CURRENCIES = [
 ];
 
 // All map countries excluded from the game are "distractors" that can be clicked.
+
+// 🐻 Mode uses ONLY this classic study list. Every code here must also exist in
+// CURRENCIES above; codes that no longer exist (e.g. MXV) are simply ignored.
+const BEAR_CURRENCIES = [
+  "ALL", "ARS", "AUD", "BGN", "BHD", "BRL", "CAD", "CHF", "CLP", "CNY",
+  "COP", "CZK", "DKK", "EUR", "GBP", "HKD", "HUF", "IDR", "ILS", "INR",
+  "ISK", "JPY", "KRW", "MAD", "MXN", "MXV", "MYR", "NAD", "NGN", "NOK",
+  "NZD", "PEN", "PHP", "RON", "RUB", "SAR", "SEK", "SGD", "THB", "TRY",
+  "TWD", "USD", "VES", "VND", "XOF", "ZAR"
+];

@@ -1,4 +1,4 @@
-/* global d3, topojson, WORLD_TOPOJSON, CURRENCIES */
+/* global d3, topojson, WORLD_TOPOJSON, CURRENCIES, BEAR_CURRENCIES */
 
 "use strict";
 
@@ -775,13 +775,19 @@ function startGame() {
   // Browsers block audio until a user gesture; Start click counts as one.
   ensureAudio();
 
-  // Build the question pool from the real currency data — every country on
-  // the map now has a real currency assigned, so both 🐻 on/off use the same
-  // full world list.
+  // Build the question pool from the real currency data. In 🐻 mode, restrict
+  // to ONLY the classic study list (BEAR_CURRENCIES). Otherwise use every
+  // currency in data.js. Ranked forces 🐻 OFF, so it plays the full list.
   // Number of rounds: clamp to 1 .. number of available questions. The menu
-  // sets the default (46 in 🐻 mode, 40 in normal mode); max = total countries.
-  let questions = shuffle(CURRENCIES.map(c => ({ ...c })));
-  const roundsRequested = Math.max(1, parseInt($("#roundsInput").value, 10) || (bearMode ? 46 : 40));
+  // sets the default (BEAR_COUNT in 🐻 mode, 40 in normal mode); max = the
+  // size of the active pool.
+  let questions = CURRENCIES.map(c => ({ ...c }));
+  if (bearMode) {
+    const bearSet = new Set(BEAR_CURRENCIES);
+    questions = questions.filter(c => bearSet.has(c.code));
+  }
+  questions = shuffle(questions);
+  const roundsRequested = Math.max(1, parseInt($("#roundsInput").value, 10) || (bearMode ? BEAR_COUNT : 40));
   const rounds = Math.min(roundsRequested, questions.length);
   questions = questions.slice(0, rounds);
 
@@ -1161,6 +1167,20 @@ window.addEventListener("error", ev => {
 // menu turns red. Switching OFF restores the user's previous inputs.
 const RANK_BODY_CLASS = "rank-active";
 
+// Sizes of the two question pools, used to bound the Rounds input.
+const BEAR_LIST = new Set(BEAR_CURRENCIES);
+const BEAR_COUNT = CURRENCIES.filter(c => BEAR_LIST.has(c.code)).length;
+const FULL_COUNT = CURRENCIES.length;
+
+// Bound the Rounds input to the size of the active pool: BEAR_COUNT in 🐻
+// mode, FULL_COUNT otherwise. Never lets the user request more than exists.
+function syncRoundsMax() {
+  const roundsEl = $("#roundsInput");
+  roundsEl.max = $("#bearModeInput").checked ? BEAR_COUNT : FULL_COUNT;
+  const v = parseInt(roundsEl.value, 10);
+  if (Number.isFinite(v) && v > roundsEl.max) roundsEl.value = roundsEl.max;
+}
+
 function applyRankMenuState() {
   const ranked = $("#rankModeInput").checked;
   const guess = $("#guessTimeInput");
@@ -1242,6 +1262,7 @@ function applyRankMenuState() {
   }
 
   document.body.classList.toggle(RANK_BODY_CLASS, ranked);
+  syncRoundsMax();
 }
 
 // ================= Wire up UI =================
@@ -1250,17 +1271,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initialize menu state from the rank toggle (off by default).
   applyRankMenuState();
+  syncRoundsMax();
   $("#rankModeInput").addEventListener("change", applyRankMenuState);
 
-  // Switching 🐻 mode adjusts the rounds default: 46 in 🐻, 40 in normal
-  // (only while not in ranked mode, which locks all settings anyway).
+  // Switching 🐻 mode adjusts the rounds default and max: BEAR_COUNT in 🐻,
+  // 40 default / FULL_COUNT max in normal (only while not in ranked mode,
+  // which locks all settings anyway).
   $("#bearModeInput").addEventListener("change", () => {
     if (!$("#rankModeInput").checked) {
       const roundsEl = $("#roundsInput");
       if (roundsEl.dataset.pref === undefined) {
         roundsEl.dataset.pref = roundsEl.value;
       }
-      roundsEl.value = $("#bearModeInput").checked ? 46 : 40;
+      roundsEl.value = $("#bearModeInput").checked ? BEAR_COUNT : 40;
+      syncRoundsMax();
     }
   });
 
