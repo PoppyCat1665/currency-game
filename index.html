@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Currency Guessing Game</title>
-  <link rel="stylesheet" href="styles.css?v=19">
+  <link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
 
@@ -56,9 +56,9 @@
           <span>Sound Effects</span>
           <input id="soundInput" type="checkbox" checked>
         </label>
-        <label class="setting toggle" title="ON: use only the listed currencies. OFF: every country on the map is a playable target (listed + unlisted)">
-          <span>🐻 Mode</span>
-          <input id="bearModeInput" type="checkbox">
+        <label class="setting toggle" title="ON: use only the classic exam list. OFF: every country on the map is a playable target (listed + unlisted). Works in both casual and ranked.">
+          <span>📚 Exam Mode</span>
+          <input id="examModeInput" type="checkbox">
         </label>
       </div>
 
@@ -69,14 +69,14 @@
 
       <div class="start-row">
         <button id="startBtn" class="btn primary">Start Game</button>
-        <label class="rank-toggle" title="Hard mode: 5s per question, 1 guess, tiny 10km click radius, no interval breaks">
+        <label class="rank-toggle" title="Hard mode: 5s per question, 1 guess, 250 km click radius, no interval breaks">
           <input id="rankModeInput" type="checkbox">
           <span class="rank-label">😈 RANK</span>
         </label>
       </div>
       <p class="hint">You'll be shown a currency – click the country that uses it before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v2.1</p>
+      <p class="version" id="appVersion">v2.2</p>
     </div>
   </div>
 
@@ -166,10 +166,10 @@
     </div>
   </div>
 
-  <script src="lib/d3.min.js?v=19"></script>
-  <script src="lib/topojson.min.js?v=19"></script>
-  <script src="lib/world.js?v=19"></script>
-  <script src="data.js?v=19"></script>
-  <script src="game.js?v=19"></script>
+  <script src="lib/d3.min.js?v=20"></script>
+  <script src="lib/topojson.min.js?v=20"></script>
+  <script src="lib/world.js?v=20"></script>
+  <script src="data.js?v=20"></script>
+  <script src="game.js?v=20"></script>
 </body>
 </html>

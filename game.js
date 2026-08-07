@@ -1,4 +1,4 @@
-/* global d3, topojson, WORLD_TOPOJSON, CURRENCIES, BEAR_CURRENCIES */
+/* global d3, topojson, WORLD_TOPOJSON, CURRENCIES, EXAM_CURRENCIES */
 
 "use strict";
 
@@ -762,34 +762,35 @@ function startGame() {
     ? Math.max(0, parseInt($("#intervalTimeInput").value, 10) || 3)
     : 0; // interval off -> skip straight to the next round
   const maxGuesses = rankMode ? 1 : Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
-  const snapRadiusKm = rankMode ? 100 : Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
+  const snapRadiusKm = rankMode ? 250 : Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
 
   // Read display & sound preferences for this session
   const showFullName = $("#showFullNameInput").checked;
   const showCountryNames = $("#showCountryNamesInput").checked;
   soundsEnabled = $("#soundInput").checked;
 
-  // 🐻 mode: ON = only the listed currencies (the classic study list).
+  // 📚 Exam mode: ON = only the classic study list.
   // OFF = every currency in data.js is a playable target (currently covers
-  // all countries on the map with real currencies). Ranked forces 🐻 OFF.
-  const bearMode = rankMode ? false : $("#bearModeInput").checked;
+  // all countries on the map with real currencies). Works in both casual and
+  // ranked play.
+  const examMode = $("#examModeInput").checked;
 
   // Browsers block audio until a user gesture; Start click counts as one.
   ensureAudio();
 
-  // Build the question pool from the real currency data. In 🐻 mode, restrict
-  // to ONLY the classic study list (BEAR_CURRENCIES). Otherwise use every
-  // currency in data.js. Ranked forces 🐻 OFF, so it plays the full list.
+  // Build the question pool from the real currency data. In 📚 Exam mode,
+  // restrict to ONLY the classic study list (EXAM_CURRENCIES). Otherwise use
+  // every currency in data.js.
   // Number of rounds: clamp to 1 .. number of available questions. The menu
-  // sets the default (BEAR_COUNT in 🐻 mode, 40 in normal mode); max = the
+  // sets the default (EXAM_COUNT in 📚 mode, 40 in normal mode); max = the
   // size of the active pool.
   let questions = CURRENCIES.map(c => ({ ...c }));
-  if (bearMode) {
-    const bearSet = new Set(BEAR_CURRENCIES);
-    questions = questions.filter(c => bearSet.has(c.code));
+  if (examMode) {
+    const examSet = new Set(EXAM_CURRENCIES);
+    questions = questions.filter(c => examSet.has(c.code));
   }
   questions = shuffle(questions);
-  const roundsRequested = Math.max(1, parseInt($("#roundsInput").value, 10) || (bearMode ? BEAR_COUNT : 40));
+  const roundsRequested = Math.max(1, parseInt($("#roundsInput").value, 10) || (examMode ? EXAM_COUNT : 40));
   const rounds = Math.min(roundsRequested, questions.length);
   questions = questions.slice(0, rounds);
 
@@ -818,7 +819,7 @@ function startGame() {
     showFullName,
     showCountryNames,
     rankMode,
-    bearMode,
+    examMode,
     playerName,
     streak,
     highestStreak,
@@ -1165,20 +1166,20 @@ window.addEventListener("error", ev => {
 
 // ================= Rank mode menu toggle =================
 // When rank mode is switched ON the menu settings visibly change to the
-// forced hard values (5s, interval off, 1 guess, 10 km radius) and the whole
+// forced hard values (5s, interval off, 1 guess, 250 km radius) and the whole
 // menu turns red. Switching OFF restores the user's previous inputs.
 const RANK_BODY_CLASS = "rank-active";
 
 // Sizes of the two question pools, used to bound the Rounds input.
-const BEAR_LIST = new Set(BEAR_CURRENCIES);
-const BEAR_COUNT = CURRENCIES.filter(c => BEAR_LIST.has(c.code)).length;
+const EXAM_LIST = new Set(EXAM_CURRENCIES);
+const EXAM_COUNT = CURRENCIES.filter(c => EXAM_LIST.has(c.code)).length;
 const FULL_COUNT = CURRENCIES.length;
 
-// Bound the Rounds input to the size of the active pool: BEAR_COUNT in 🐻
+// Bound the Rounds input to the size of the active pool: EXAM_COUNT in 📚
 // mode, FULL_COUNT otherwise. Never lets the user request more than exists.
 function syncRoundsMax() {
   const roundsEl = $("#roundsInput");
-  roundsEl.max = $("#bearModeInput").checked ? BEAR_COUNT : FULL_COUNT;
+  roundsEl.max = $("#examModeInput").checked ? EXAM_COUNT : FULL_COUNT;
   const v = parseInt(roundsEl.value, 10);
   if (Number.isFinite(v) && v > roundsEl.max) roundsEl.value = roundsEl.max;
 }
@@ -1193,10 +1194,11 @@ function applyRankMenuState() {
   const roundsInput = $("#roundsInput");
   const fullName = $("#showFullNameInput");
   const countryNames = $("#showCountryNamesInput");
-  const bearMode = $("#bearModeInput");
+  const examMode = $("#examModeInput");
   const nameInput = $("#playerNameInput");
 
-  // Locked in rank mode: difficulty numbers/toggles + display toggles + 🐻.
+  // Locked in rank mode: difficulty numbers/toggles + display toggles.
+  // 📚 Exam mode stays unlocked so it can be toggled during ranked play.
   const settingsToLock = [
     "guessTimeInput",
     "intervalToggleInput",
@@ -1205,8 +1207,7 @@ function applyRankMenuState() {
     "snapRadiusInput",
     "roundsInput",
     "showFullNameInput",
-    "showCountryNamesInput",
-    "bearModeInput"
+    "showCountryNamesInput"
   ];
 
   if (ranked) {
@@ -1221,19 +1222,18 @@ function applyRankMenuState() {
       roundsInput.dataset.pref = roundsInput.value;
       fullName.dataset.pref = fullName.checked ? "1" : "0";
       countryNames.dataset.pref = countryNames.checked ? "1" : "0";
-      bearMode.dataset.pref = bearMode.checked ? "1" : "0";
+      examMode.dataset.pref = examMode.checked ? "1" : "0";
     }
-    // Force rank values.
+    // Force rank values. 📚 Exam mode is left as-is (togglable).
     guess.value = 5;
     guesses.value = 1;
-    radius.value = 100;
-    roundsInput.value = 55;      // ranked always plays 55 rounds
+    radius.value = 250;
+    roundsInput.value = examMode.checked ? EXAM_COUNT : 55; // 55 rounds, or the exam list size if 📚 on
     intervalToggle.checked = false;
     intervalTime.disabled = true;
     intervalTime.value = 0;
     fullName.checked = false;        // rank hides full currency names
     countryNames.checked = true;     // rank always shows country names
-    bearMode.checked = false;        // 🐻 force off in ranked
     nameInput.placeholder = "Your name… (shown in rank mode)";
     // Lock every option input so the player can't change them mid-rank.
     settingsToLock.forEach(id => {
@@ -1252,7 +1252,7 @@ function applyRankMenuState() {
       roundsInput.value = roundsInput.dataset.pref;
       fullName.checked = fullName.dataset.pref === "1";
       countryNames.checked = countryNames.dataset.pref === "1";
-      bearMode.checked = bearMode.dataset.pref === "1";
+      examMode.checked = examMode.dataset.pref === "1";
     }
     nameInput.placeholder = "Your name…";
     // Re-enable every option input.
@@ -1276,18 +1276,19 @@ document.addEventListener("DOMContentLoaded", () => {
   syncRoundsMax();
   $("#rankModeInput").addEventListener("change", applyRankMenuState);
 
-  // Switching 🐻 mode adjusts the rounds default and max: BEAR_COUNT in 🐻,
-  // 40 default / FULL_COUNT max in normal (only while not in ranked mode,
-  // which locks all settings anyway).
-  $("#bearModeInput").addEventListener("change", () => {
-    if (!$("#rankModeInput").checked) {
-      const roundsEl = $("#roundsInput");
-      if (roundsEl.dataset.pref === undefined) {
-        roundsEl.dataset.pref = roundsEl.value;
-      }
-      roundsEl.value = $("#bearModeInput").checked ? BEAR_COUNT : 40;
-      syncRoundsMax();
+  // Switching 📚 Exam mode adjusts the rounds default and max: EXAM_COUNT in
+  // 📚 mode, 40 default / FULL_COUNT max in casual. In ranked play (exam stays
+  // togglable) it updates the rounds to the exam list size as well.
+  $("#examModeInput").addEventListener("change", () => {
+    const roundsEl = $("#roundsInput");
+    if (roundsEl.dataset.pref === undefined) {
+      roundsEl.dataset.pref = roundsEl.value;
     }
+    const ranked = $("#rankModeInput").checked;
+    roundsEl.value = $("#examModeInput").checked
+      ? EXAM_COUNT
+      : (ranked ? 55 : 40);
+    syncRoundsMax();
   });
 
   $("#startBtn").addEventListener("click", startGame);
