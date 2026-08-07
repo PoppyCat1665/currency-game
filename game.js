@@ -1420,12 +1420,51 @@ function makeCountryRow(c) {
     if (cb.checked) selectedCountries.add(c.id);
     else selectedCountries.delete(c.id);
     saveSettings();
+    updateContinentCounts();
   });
   const span = document.createElement("span");
   span.textContent = c.name;
   label.appendChild(cb);
   label.appendChild(span);
   return label;
+}
+
+// Toggle every country inside a continent heading on/off.
+function toggleContinent(head) {
+  const rows = [];
+  let el = head.nextElementSibling;
+  while (el && !el.classList.contains("country-continent")) {
+    if (el.classList.contains("country-toggle")) rows.push(el);
+    el = el.nextElementSibling;
+  }
+  if (!rows.length) return;
+  const allOn = rows.every(r => r.querySelector("input").checked);
+  rows.forEach(r => {
+    const cb = r.querySelector("input");
+    cb.checked = !allOn;
+    const id = Number(cb.dataset.id);
+    if (cb.checked) selectedCountries.add(id);
+    else selectedCountries.delete(id);
+  });
+  saveSettings();
+  updateContinentCounts();
+}
+
+// Refresh each continent heading's "selected / total" badge.
+function updateContinentCounts() {
+  document.querySelectorAll(".country-continent").forEach(head => {
+    let total = 0, sel = 0;
+    let el = head.nextElementSibling;
+    while (el && !el.classList.contains("country-continent")) {
+      if (el.classList.contains("country-toggle")) {
+        total++;
+        if (el.querySelector("input").checked) sel++;
+      }
+      el = el.nextElementSibling;
+    }
+    const badge = head.querySelector(".cont-count");
+    if (badge) badge.textContent = sel + "/" + total;
+  });
 }
 
 const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Antarctica"];
@@ -1442,23 +1481,28 @@ function renderCountryList() {
     (groups[cont] = groups[cont] || []).push(c);
   });
 
-  CONTINENT_ORDER.forEach(cont => {
-    if (!groups[cont] || groups[cont].length === 0) return;
+  const appendHeading = cont => {
     const head = document.createElement("div");
     head.className = "country-continent";
-    head.textContent = cont;
+    head.dataset.continent = cont;
+    const name = document.createElement("span");
+    name.textContent = cont;
+    const badge = document.createElement("span");
+    badge.className = "cont-count";
+    head.appendChild(name);
+    head.appendChild(badge);
     container.appendChild(head);
     groups[cont].forEach(c => container.appendChild(makeCountryRow(c)));
     delete groups[cont];
+  };
+
+  CONTINENT_ORDER.forEach(cont => {
+    if (groups[cont] && groups[cont].length) appendHeading(cont);
   });
   // Any ungrouped fall into "Other" at the end.
-  if (groups.Other && groups.Other.length) {
-    const head = document.createElement("div");
-    head.className = "country-continent";
-    head.textContent = "Other";
-    container.appendChild(head);
-    groups.Other.forEach(c => container.appendChild(makeCountryRow(c)));
-  }
+  if (groups.Other && groups.Other.length) appendHeading("Other");
+
+  updateContinentCounts();
 }
 
 function setAllCountries(on) {
@@ -1639,6 +1683,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   $("#countryAllBtn").addEventListener("click", () => setAllCountries(true));
   $("#countryNoneBtn").addEventListener("click", () => setAllCountries(false));
+  // Clicking a continent heading toggles every country in it.
+  document.addEventListener("click", e => {
+    const head = e.target.closest && e.target.closest(".country-continent");
+    if (head) {
+      e.preventDefault();
+      toggleContinent(head);
+    }
+  });
   // Exam mode disables the country toggle.
   syncCountriesState();
   $("#examModeInput").addEventListener("change", syncCountriesState);
