@@ -574,20 +574,22 @@ function hideFeedback() {
 let scoreAnimFrame = null;   // cancel any in-flight score tween
 
 // Update the HUD score. In ranked mode the number counts up smoothly from the
-// previous value; in casual mode it snaps instantly. If the score didn't
-// actually change (e.g. a timeout or out-of-guesses), just show the value —
-// don't replay the count-up animation.
+// previous value; in casual mode it snaps instantly. `previousScore` is kept in
+// sync with the last value actually shown, so a non-scoring update (timeout,
+// out-of-guesses) never replays the count-up and never restarts from 0.
 function updateScoreDisplay() {
   const el = $("#score");
   const target = game.score;
   if (!game.rankMode) {
     el.textContent = target;
+    game.previousScore = target;
     return;
   }
   const from = (typeof game.previousScore === "number") ? game.previousScore : 0;
   if (target === from) {
     if (scoreAnimFrame) cancelAnimationFrame(scoreAnimFrame);
     el.textContent = target;
+    game.previousScore = target;
     return;
   }
   const duration = 500; // ms
@@ -597,8 +599,12 @@ function updateScoreDisplay() {
     const t = Math.min(1, (performance.now() - start) / duration);
     const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
     el.textContent = Math.round(from + (target - from) * eased);
-    if (t < 1) scoreAnimFrame = requestAnimationFrame(step);
-    else scoreAnimFrame = null;
+    if (t < 1) {
+      scoreAnimFrame = requestAnimationFrame(step);
+    } else {
+      scoreAnimFrame = null;
+      game.previousScore = target;   // keep in sync once the count-up finishes
+    }
   };
   step();
 }
