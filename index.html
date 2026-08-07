@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Currency Guessing Game</title>
-  <link rel="stylesheet" href="styles.css?v=28">
+  <link rel="stylesheet" href="styles.css?v=29">
 </head>
 <body>
 
@@ -26,7 +26,7 @@
 
       <p class="hint">You'll be shown a currency – click the country that uses it before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v3.7</p>
+      <p class="version" id="appVersion">v3.8</p>
     </div>
   </div>
 
@@ -45,6 +45,7 @@
           <button class="cat-btn" data-cat="map">Map</button>
           <button class="cat-btn" data-cat="audio">Audio</button>
           <button class="cat-btn" data-cat="study">Study</button>
+          <button class="cat-btn" data-cat="countries">Countries</button>
           <button class="cat-btn" data-cat="player">Player</button>
           <button class="cat-btn" data-cat="other">Other</button>
         </nav>
@@ -116,6 +117,19 @@
               <input id="examModeInput" type="checkbox">
             </label>
             <p class="setting-note">Practice under conditions similar to your test, using only the classic study list.</p>
+          </section>
+
+          <section class="cat-section" data-section="countries">
+            <h3>Countries</h3>
+            <div class="country-filter-bar">
+              <input id="countrySearch" type="text" placeholder="Search countries…">
+              <div class="country-filter-actions">
+                <button id="countryAllBtn" class="btn tiny">All</button>
+                <button id="countryNoneBtn" class="btn tiny">None</button>
+              </div>
+            </div>
+            <div id="countryList" class="country-list"></div>
+            <p class="setting-note">Only currencies used by the toggled-on countries appear. Ignored in Ranked and Exam mode.</p>
           </section>
 
           <section class="cat-section" data-section="player">
@@ -259,10 +273,10 @@
     </div>
   </div>
 
-  <script src="lib/d3.min.js?v=28"></script>
-  <script src="lib/topojson.min.js?v=28"></script>
-  <script src="lib/world.js?v=28"></script>
-  <script src="data.js?v=28"></script>
-  <script src="game.js?v=28"></script>
+  <script src="lib/d3.min.js?v=29"></script>
+  <script src="lib/topojson.min.js?v=29"></script>
+  <script src="lib/world.js?v=29"></script>
+  <script src="data.js?v=29"></script>
+  <script src="game.js?v=29"></script>
 </body>
 </html>

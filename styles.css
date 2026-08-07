@@ -1046,6 +1046,50 @@ body.rank-active .credit { color: #a06a6a; }
 }
 .settings-footer .btn { flex: 1; }
 
+/* ---------- Country toggle list ---------- */
+.country-filter-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.country-filter-bar input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0d1530;
+  color: var(--text);
+  font-size: 14px;
+}
+.country-filter-actions { display: flex; gap: 6px; }
+.btn.tiny { padding: 7px 12px; font-size: 12px; }
+
+.country-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.country-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+.country-toggle:hover { background: rgba(255, 255, 255, 0.06); }
+.country-toggle input { flex-shrink: 0; accent-color: var(--accent); width: 16px; height: 16px; }
+.country-toggle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Responsive: settings nav becomes tabs on smaller screens */
 @media (max-width: 640px) {
   .settings-body { flex-direction: column; }

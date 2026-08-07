@@ -162,6 +162,16 @@ let svgW = 0, svgH = 0;        // cached viewport size
 // Used to turn a "click radius in km" into a real nearby-area hit test.
 let countryBoundaries = [];
 
+// Countries available for the Country toggle (id + name), sorted by name.
+let countryList = [];
+
+// Country toggle selection: a Set of numeric country ids. Empty means "all".
+// Only applies to casual (non-rank, non-exam) play.
+const selectedCountries = new Set();
+
+// localStorage key for persisting all settings.
+const SETTINGS_KEY = "currencyGameSettings_v1";
+
 function buildCountryBoundaries() {
   countryBoundaries = countryFeatures.map(f => {
     const geom = f.geometry;
@@ -266,6 +276,11 @@ function initMap() {
   highlightG.raise();
 
   buildCountryBoundaries();
+
+  // Build the sorted country list used by the Country toggle in settings.
+  countryList = countryFeatures
+    .map(f => ({ id: f.id, name: f.properties.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   window.addEventListener("resize", debounce(resizeMap, 150));
 
@@ -815,6 +830,11 @@ function startGame() {
     const examSet = new Set(EXAM_CURRENCIES);
     questions = questions.filter(c => examSet.has(c.code));
   }
+  // Country toggle: only in casual (not ranked, not exam). Restrict to
+  // currencies used by the toggled-on countries, if any are unselected.
+  if (!rankMode && !examMode && selectedCountries.size > 0 && selectedCountries.size < countryList.length) {
+    questions = questions.filter(q => q.countries.some(id => selectedCountries.has(id)));
+  }
   questions = shuffle(questions);
   // Rounds: if ranked WITH Exam mode on, just use the full exam list
   // (EXAM_COUNT rounds). Otherwise ranked uses the chosen rank mode
@@ -1328,7 +1348,96 @@ function openSettings() {
   openOverlay("settingsOverlay");
 }
 
-function closeSettings() { closeOverlay("settingsOverlay"); }
+function closeSettings() {
+  saveSettings();
+  closeOverlay("settingsOverlay");
+}
+
+// ================= Settings persistence (localStorage) =================
+// Save all casual settings + the selected country set. Closing settings (or
+// changing any option) persists them so nothing is lost on reopen/reload.
+function saveSettings() {
+  try {
+    const data = {
+      guessTime: $("#guessTimeInput").value,
+      intervalToggle: $("#intervalToggleInput").checked,
+      intervalTime: $("#intervalTimeInput").value,
+      maxGuesses: $("#maxGuessesInput").value,
+      snapRadius: $("#snapRadiusInput").value,
+      rounds: $("#roundsInput").value,
+      showFullName: $("#showFullNameInput").checked,
+      showCountryNames: $("#showCountryNamesInput").checked,
+      sound: $("#soundInput").checked,
+      examMode: $("#examModeInput").checked,
+      playerName: $("#playerNameInput").value,
+      countries: [...selectedCountries]
+    };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+  } catch (e) { /* storage unavailable — ignore */ }
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (d.guessTime !== undefined) $("#guessTimeInput").value = d.guessTime;
+    if (d.intervalToggle !== undefined) $("#intervalToggleInput").checked = !!d.intervalToggle;
+    if (d.intervalTime !== undefined) $("#intervalTimeInput").value = d.intervalTime;
+    if (d.maxGuesses !== undefined) $("#maxGuessesInput").value = d.maxGuesses;
+    if (d.snapRadius !== undefined) $("#snapRadiusInput").value = d.snapRadius;
+    if (d.rounds !== undefined) $("#roundsInput").value = d.rounds;
+    if (d.showFullName !== undefined) $("#showFullNameInput").checked = !!d.showFullName;
+    if (d.showCountryNames !== undefined) $("#showCountryNamesInput").checked = !!d.showCountryNames;
+    if (d.sound !== undefined) $("#soundInput").checked = !!d.sound;
+    if (d.examMode !== undefined) $("#examModeInput").checked = !!d.examMode;
+    if (d.playerName !== undefined) $("#playerNameInput").value = d.playerName;
+    if (Array.isArray(d.countries)) {
+      selectedCountries.clear();
+      d.countries.forEach(id => selectedCountries.add(Number(id)));
+    }
+  } catch (e) { /* corrupt save — ignore */ }
+}
+
+// ================= Country toggle =================
+// Default: every country selected (i.e. no restriction).
+function initSelectedCountries() {
+  if (selectedCountries.size === 0 && countryList.length) {
+    countryList.forEach(c => selectedCountries.add(c.id));
+  }
+}
+
+function renderCountryList() {
+  const container = $("#countryList");
+  if (!container) return;
+  container.innerHTML = "";
+  countryList.forEach(c => {
+    const label = document.createElement("label");
+    label.className = "country-toggle";
+    label.dataset.name = c.name.toLowerCase();
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = selectedCountries.has(c.id);
+    cb.dataset.id = c.id;
+    cb.addEventListener("change", () => {
+      if (cb.checked) selectedCountries.add(c.id);
+      else selectedCountries.delete(c.id);
+      saveSettings();
+    });
+    const span = document.createElement("span");
+    span.textContent = c.name;
+    label.appendChild(cb);
+    label.appendChild(span);
+    container.appendChild(label);
+  });
+}
+
+function setAllCountries(on) {
+  selectedCountries.clear();
+  if (on) countryList.forEach(c => selectedCountries.add(c.id));
+  document.querySelectorAll(".country-toggle input").forEach(cb => { cb.checked = on; });
+  saveSettings();
+}
 
 // Generic overlay open/close with a short fade/slide animation.
 function openOverlay(id) {
@@ -1380,8 +1489,10 @@ function resetDefaults() {
   $("#soundInput").checked = true;
   $("#examModeInput").checked = false;
   $("#playerNameInput").value = "";
+  setAllCountries(true);   // reset country toggles to all-on
   syncRoundsMax();
   syncIntervalState();
+  saveSettings();
 }
 
 // Return to the main menu, always in the normal (non-rank) state.
@@ -1401,11 +1512,36 @@ function goToMenu() {
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
 
-  // Initialize menu state from the rank toggle (off by default).
+  // Restore persisted settings (needs countryList built by initMap), then
+  // render the country toggles and apply menu state.
+  loadSettings();
+  initSelectedCountries();
+  renderCountryList();
   applyRankMenuState();
   syncRoundsMax();
   syncIntervalState();
   $("#rankModeInput").addEventListener("change", applyRankMenuState);
+
+  // Save any changed casual setting as soon as it changes.
+  [
+    "guessTimeInput", "intervalToggleInput", "intervalTimeInput",
+    "maxGuessesInput", "snapRadiusInput", "roundsInput",
+    "showFullNameInput", "showCountryNamesInput", "soundInput",
+    "examModeInput", "playerNameInput"
+  ].forEach(id => {
+    const el = $(id);
+    if (el) el.addEventListener("change", saveSettings);
+  });
+
+  // Country toggle controls.
+  $("#countrySearch").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll(".country-toggle").forEach(row => {
+      row.style.display = row.dataset.name.includes(q) ? "" : "none";
+    });
+  });
+  $("#countryAllBtn").addEventListener("click", () => setAllCountries(true));
+  $("#countryNoneBtn").addEventListener("click", () => setAllCountries(false));
 
   // Mode buttons: PLAY = casual, RANKED = rank mode.
   $("#playBtn").addEventListener("click", () => {
