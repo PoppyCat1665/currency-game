@@ -507,21 +507,25 @@ input[type="number"] {
 .country.correct { fill: #2dd4a7; stroke: #eafff6; stroke-width: 0.7; }
 .country.wrong   { fill: #f87171; stroke: #ffe4e4; stroke-width: 0.7; }
 
-/* Pulse the answered country so the player sees which was right/wrong. */
-@keyframes answerPulse {
-  0%, 100% { filter: brightness(1); }
-  50%      { filter: brightness(1.6); }
+/* Pulse the answered country so the player clearly sees which was right/wrong.
+   Pulsing the FILL color (not just a brightness filter) is much more visible. */
+@keyframes correctPulse {
+  0%, 100% { fill: #2dd4a7; }
+  50%      { fill: #eafff6; }
 }
-.country.correct, .country.wrong {
-  animation: answerPulse 0.7s ease-in-out 2;
+@keyframes wrongPulse {
+  0%, 100% { fill: #f87171; }
+  50%      { fill: #ffdada; }
 }
+.country.correct { animation: correctPulse 0.6s ease-in-out 3; }
+.country.wrong   { animation: wrongPulse 0.6s ease-in-out 3; }
 
 /* The answer ring flashes too for extra visibility. */
 @keyframes ringPulse {
   0%, 100% { stroke-opacity: 1; }
   50%      { stroke-opacity: 0.25; }
 }
-.hl circle { animation: ringPulse 0.7s ease-in-out 2; }
+.hl circle { animation: ringPulse 0.6s ease-in-out 3; }
 
 /* Click-catching layer that sits underneath the countries (ocean clicks). */
 .ocean { pointer-events: all; fill: transparent; cursor: pointer; }
