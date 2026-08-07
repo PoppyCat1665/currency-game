@@ -574,7 +574,9 @@ function hideFeedback() {
 let scoreAnimFrame = null;   // cancel any in-flight score tween
 
 // Update the HUD score. In ranked mode the number counts up smoothly from the
-// previous value; in casual mode it snaps instantly.
+// previous value; in casual mode it snaps instantly. If the score didn't
+// actually change (e.g. a timeout or out-of-guesses), just show the value —
+// don't replay the count-up animation.
 function updateScoreDisplay() {
   const el = $("#score");
   const target = game.score;
@@ -583,6 +585,11 @@ function updateScoreDisplay() {
     return;
   }
   const from = (typeof game.previousScore === "number") ? game.previousScore : 0;
+  if (target === from) {
+    if (scoreAnimFrame) cancelAnimationFrame(scoreAnimFrame);
+    el.textContent = target;
+    return;
+  }
   const duration = 500; // ms
   const start = performance.now();
   if (scoreAnimFrame) cancelAnimationFrame(scoreAnimFrame);
@@ -1020,8 +1027,9 @@ function resolveQuestion(clickedId) {
       const speedBonus = Math.floor(remainingSec * 10);
       const gained = 100 + speedBonus;
 
-      // Track answer time for fastest/average.
-      const answerMs = game.guessMs - remainingMs;
+      // Track answer time for fastest/average. Clamp so an instant answer (or
+      // a tiny timing overshoot) can't produce a negative time.
+      const answerMs = Math.max(0, game.guessMs - remainingMs);
       game.answerTimes.push(answerMs);
       if (answerMs < game.fastestAnswer) game.fastestAnswer = answerMs;
 
@@ -1163,7 +1171,9 @@ function showResults() {
     rankBox.classList.remove("hidden");
     playSound("rankup");
 
-    $("#finalFastest").textContent = ((game.fastestAnswer || 0) / 1000).toFixed(1) + "s";
+    $("#finalFastest").textContent = Number.isFinite(game.fastestAnswer)
+      ? (game.fastestAnswer / 1000).toFixed(1) + "s"
+      : "–";   // no correct answers this game
     fastestStat.classList.remove("hidden");
   } else {
     rankBox.classList.add("hidden");
