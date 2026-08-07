@@ -1520,6 +1520,7 @@ function setAllCountries(on) {
   if (on) countryList.forEach(c => selectedCountries.add(c.id));
   document.querySelectorAll(".country-toggle input").forEach(cb => { cb.checked = on; });
   saveSettings();
+  updateContinentCounts();
 }
 
 // When 📚 Exam mode is ON, the Country toggle is ignored and disabled.
