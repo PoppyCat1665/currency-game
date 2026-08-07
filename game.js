@@ -219,20 +219,23 @@ function initMap() {
   // Reference for diagnostics/testing; harmless.
   svg.node().__zoomBehavior = zoomBehavior;
 
-  // Pen / touch tap detection. d3-zoom's drag handling can swallow taps from
-  // an Apple Pencil or finger, making it pan instead of selecting. We detect a
-  // quick, non-dragging pointer lift and resolve it as a country selection.
-  // Mouse still uses the normal click handlers below.
+  // Pen / touch / mouse tap detection. d3-zoom's drag handling can swallow taps
+  // from an Apple Pencil or finger, making it pan instead of selecting. We
+  // detect a quick, non-dragging pointer lift and resolve it as a selection.
+  // Native CAPTURE-phase listeners run before d3-zoom so they can't be blocked,
+  // and this is the SINGLE selection path (mouse, touch, pen) — no click
+  // handlers — which prevents resolving a guess twice (a "double click").
+  const svgNode = svg.node();
   let tapState = null;
-  svg.on("pointerdown", ev => {
-    if (ev.pointerType === "mouse") { tapState = null; return; }
+  svgNode.addEventListener("pointerdown", ev => {
+    if (ev.pointerType === "mouse" && ev.button !== 0) { tapState = null; return; }
     tapState = { x: ev.clientX, y: ev.clientY, t: performance.now(), moved: false };
-  });
-  svg.on("pointermove", ev => {
+  }, true);
+  svgNode.addEventListener("pointermove", ev => {
     if (!tapState) return;
     if (Math.hypot(ev.clientX - tapState.x, ev.clientY - tapState.y) > 8) tapState.moved = true;
-  });
-  svg.on("pointerup", ev => {
+  }, true);
+  svgNode.addEventListener("pointerup", ev => {
     if (!tapState) return;
     const s = tapState;
     tapState = null;
@@ -240,16 +243,16 @@ function initMap() {
     if (isTap && game && game.phase === "question" && game.tapSelect) {
       resolveQuestionByRadius(ev);
     }
-  });
-  svg.on("pointercancel", () => { tapState = null; });
+  }, true);
+  svgNode.addEventListener("pointercancel", () => { tapState = null; }, true);
 
   mapG = svg.append("g");
 
   // Ocean click-catcher under the countries: catches clicks near tiny nations.
+  // Selection is handled by the pointer tap detection above.
   mapG.append("path")
       .attr("class", "ocean")
-      .attr("d", path({ type: "Sphere" }))
-      .on("click", resolveQuestionByRadius);
+      .attr("d", path({ type: "Sphere" }));
 
   // Group for the circle markers drawn around highlighted countries.
   // Lives INSIDE mapG so rings inherit the zoom/pan transform and always
@@ -293,7 +296,6 @@ function initMap() {
       .attr("class", "country")
       .attr("data-id", d => d.id)
       .attr("pointer-events", "visible")
-      .on("click", onCountryClick)
       .on("mousemove", ev => moveTooltip(ev))
       .on("mouseover", (ev, d) => showTooltip(ev, d.properties.name))
       .on("mouseout", hideTooltip);
@@ -533,6 +535,7 @@ function resolveQuestionByRadius(event) {
       }
     }
     resolveQuestion(chosenId);
+    lastAnswerTapAt = performance.now();
   }
   // Far from any country (pure ocean click) — ignore completely, don't count a guess.
 }
@@ -738,8 +741,15 @@ function advanceInterval(isFinal) {
 // Clicking anywhere during the interval wait skips the remaining wait time.
 // Using capture phase on document means it fires even if d3-zoom or a country
 // path handler swallows/stops the bubbled event on the map.
+// Timestamp of the most recent tap that answered a question. Used to ignore the
+// trailing click that a tap generates, so it doesn't instantly skip the reveal.
+let lastAnswerTapAt = 0;
+
 function skipInterval() {
   if (!game || game.phase !== "answered") return false;
+  // Ignore the click that trails the tap used to answer (it would skip the
+  // reveal/pulse immediately).
+  if (performance.now() - lastAnswerTapAt < 300) return false;
   const isFinal = game.index === game.total - 1;
   advanceInterval(isFinal);
   return true;
@@ -1854,12 +1864,14 @@ function applyTheme() {
   // Normal palette
   root.setProperty("--accent", normal);
   root.setProperty("--accent-strong", shade(normal, -0.18));
-  root.setProperty("--good", shade(normal, 0.30));        // Correct = light shade
-  root.setProperty("--bad", shade(normal, -0.30));        // Wrong = dark shade
+  root.setProperty("--good", shade(normal, 0.25));          // Correct = light shade
+  root.setProperty("--good-pulse", shade(normal, 0.55));    // brighter flash
+  root.setProperty("--bad", shade(normal, -0.25));          // Wrong = dark shade
+  root.setProperty("--bad-pulse", shade(normal, 0.10));     // brighter flash
   root.setProperty("--border", shade(normal, -0.12));
   root.setProperty("--acc-rgb", rgbStr(acc));
-  root.setProperty("--good-rgb", rgbStr(hexToRgb(shade(normal, 0.30))));
-  root.setProperty("--bad-rgb", rgbStr(hexToRgb(shade(normal, -0.30))));
+  root.setProperty("--good-rgb", rgbStr(hexToRgb(shade(normal, 0.25))));
+  root.setProperty("--bad-rgb", rgbStr(hexToRgb(shade(normal, -0.25))));
   root.setProperty("--primary-shadow", `rgba(${rgbStr(acc)}, 0.35)`);
   root.setProperty("--toggle-bg", `rgba(${rgbStr(acc)}, 0.25)`);
   // Map tints (dark, desaturated for legibility)
@@ -1886,8 +1898,10 @@ function applyTheme() {
   root.setProperty("--rank-rgb", rgbStr(rk));
   root.setProperty("--rank-light-rgb", rgbStr(hexToRgb(shade(rank, 0.12))));
   root.setProperty("--rank-dark-rgb", rgbStr(hexToRgb(shade(rank, -0.25))));
-  root.setProperty("--rank-good", shade(rank, 0.30));      // rank Correct = light
-  root.setProperty("--rank-bad", shade(rank, -0.30));      // rank Wrong = dark
+  root.setProperty("--rank-good", shade(rank, 0.30));       // rank Correct = light
+  root.setProperty("--rank-bad", shade(rank, -0.30));       // rank Wrong = dark
+  root.setProperty("--rank-good-pulse", shade(rank, 0.60));
+  root.setProperty("--rank-bad-pulse", shade(rank, 0.05));
 
   // Keep particles in sync (they read these next frame via setMenuBackgroundActive).
   if (typeof setMenuBackgroundActive === "function" && menuBgActive) setMenuBackgroundActive(true);

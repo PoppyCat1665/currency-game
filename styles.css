@@ -10,6 +10,8 @@
   --accent: #4cc9f0;
   --good: #2dd4a7;
   --bad: #f87171;
+  --good-pulse: #eafff6;
+  --bad-pulse: #ffdada;
   --border: #33447a;
   --accent-strong: var(--accent-strong);
   --primary-shadow: var(--primary-shadow);
@@ -44,6 +46,8 @@
   --rank-card: rgba(58, 12, 24, 0.85);
   --rank-good: #fecaca;
   --rank-bad: #7f1d1d;
+  --rank-good-pulse: #fff1f1;
+  --rank-bad-pulse: #b91c1c;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -549,11 +553,11 @@ input[type="number"] {
    Pulsing the FILL color (not just a brightness filter) is much more visible. */
 @keyframes correctPulse {
   0%, 100% { fill: var(--good); }
-  50%      { fill: color-mix(in srgb, var(--good), white 45%); }
+  50%      { fill: var(--good-pulse); }
 }
 @keyframes wrongPulse {
   0%, 100% { fill: var(--bad); }
-  50%      { fill: color-mix(in srgb, var(--bad), white 30%); }
+  50%      { fill: var(--bad-pulse); }
 }
 .country.correct { animation: correctPulse 0.6s ease-in-out 3; }
 .country.wrong   { animation: wrongPulse 0.6s ease-in-out 3; }
@@ -653,6 +657,11 @@ body,
 }
 
 body.rank-active {
+  /* Make correct/wrong (and their pulse peaks) follow the rank theme color. */
+  --good: var(--rank-good);
+  --bad: var(--rank-bad);
+  --good-pulse: var(--rank-good-pulse);
+  --bad-pulse: var(--rank-bad-pulse);
   background: radial-gradient(1200px 800px at 20% -10%, var(--rank-bg1) 0%, var(--rank-bg2) 45%, var(--rank-bg3) 100%);
 }
 
