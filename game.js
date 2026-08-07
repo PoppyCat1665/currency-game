@@ -9,6 +9,10 @@ const SCREENS = ["menu", "game", "results"];
 
 function showScreen(name) {
   SCREENS.forEach(id => $(id).classList.toggle("hidden", id !== name));
+  // Run the animated menu background only while the menu is the active screen.
+  if (typeof setMenuBackgroundActive === "function") {
+    setMenuBackgroundActive(name === "menu");
+  }
 }
 
 function formatTime(ms) {
@@ -1670,10 +1674,135 @@ function initInfoTips() {
   }
 }
 
+// ================= Animated menu background =================
+const MENU_SYMBOLS = ["$", "€", "£", "¥", "₹", "₩", "₽", "₺", "₫", "₱", "₿", "¢"];
+const REDUCED_MOTION = typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let menuBgActive = false;
+let menuParticles = null;          // { start(), stop() } once canvas is ready
+
+// Populate the drifting currency symbols once.
+function makeBgSymbols() {
+  const wrap = $("#bgSymbols");
+  if (!wrap || wrap.dataset.built) return;
+  wrap.dataset.built = "1";
+  const count = 20;
+  for (let i = 0; i < count; i++) {
+    const s = document.createElement("span");
+    s.className = "sym";
+    s.textContent = MENU_SYMBOLS[i % MENU_SYMBOLS.length];
+    s.style.left = (Math.random() * 100) + "%";
+    s.style.fontSize = (18 + Math.random() * 42) + "px";
+    s.style.animationDuration = (14 + Math.random() * 18) + "s";
+    s.style.animationDelay = (Math.random() * -24) + "s"; // negative -> already mid-drift
+    wrap.appendChild(s);
+  }
+}
+
+// Set up the particle-network canvas. The animation loop only runs while the
+// menu screen is visible (see setMenuBackgroundActive).
+function setupParticleCanvas() {
+  const canvas = $("#bgCanvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  let W = 0, H = 0;
+  const P = [];
+  let raf = null;
+
+  const resize = () => {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.max(1, window.innerWidth);
+    H = Math.max(1, window.innerHeight);
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const target = Math.min(90, Math.round((W * H) / 18000));
+    while (P.length < target) P.push(makeP());
+    P.length = target;
+  };
+
+  const makeP = () => ({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    vx: (Math.random() - 0.5) * 0.25,
+    vy: (Math.random() - 0.5) * 0.25,
+    r: Math.random() * 1.8 + 1
+  });
+
+  const step = () => {
+    ctx.clearRect(0, 0, W, H);
+    const c = document.body.classList.contains("rank-active") ? "248,113,113" : "76,201,240";
+    for (const p of P) {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < -10) p.x = W + 10; else if (p.x > W + 10) p.x = -10;
+      if (p.y < -10) p.y = H + 10; else if (p.y > H + 10) p.y = -10;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(" + c + ",0.55)";
+      ctx.fill();
+    }
+    ctx.lineWidth = 0.6;
+    for (let i = 0; i < P.length; i++) {
+      for (let j = i + 1; j < P.length; j++) {
+        const dx = P[i].x - P[j].x, dy = P[i].y - P[j].y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < 14400) { // 120px²
+          const a = 1 - Math.sqrt(d2) / 120;
+          ctx.strokeStyle = "rgba(" + c + "," + (a * 0.35) + ")";
+          ctx.beginPath();
+          ctx.moveTo(P[i].x, P[i].y);
+          ctx.lineTo(P[j].x, P[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    raf = requestAnimationFrame(step);
+  };
+
+  menuParticles = REDUCED_MOTION ? {
+    start() {}, stop() {}
+  } : {
+    start() {
+      if (raf !== null || !canvas) return;
+      resize();
+      raf = requestAnimationFrame(step);
+    },
+    stop() {
+      if (raf !== null) { cancelAnimationFrame(raf); raf = null; }
+    }
+  };
+
+  window.addEventListener("resize", debounce(resize, 150));
+}
+
+// Start/stop the particle loop depending on whether the menu is shown.
+function setMenuBackgroundActive(on) {
+  menuBgActive = on;
+  if (!menuParticles) return;
+  if (on) menuParticles.start();
+  else menuParticles.stop();
+}
+
+function initMenuBackground() {
+  makeBgSymbols();
+  setupParticleCanvas();
+  // The menu is the initially visible screen; start its animation.
+  setMenuBackgroundActive(true);
+  // Pause when the tab is hidden to save CPU/battery.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) menuParticles && menuParticles.stop();
+    else if (menuBgActive) menuParticles && menuParticles.start();
+  });
+}
+
 // ================= Wire up UI =================
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
   initInfoTips();
+  initMenuBackground();
 
   // Restore persisted settings (needs countryList built by initMap), then
   // render the country toggles and apply menu state.

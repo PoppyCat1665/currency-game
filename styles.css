@@ -54,10 +54,87 @@ body {
   /* margin:auto centers the card when it fits and keeps the top reachable
      when it's taller than the viewport and needs to scroll */
   margin: auto;
+  position: relative;
+  z-index: 1;
   /* iOS Safari requires the -webkit- prefix for backdrop-filter */
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- Main menu animated background ---------- */
+.menu-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-aurora, .bg-symbols { position: absolute; inset: 0; }
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.45;
+  mix-blend-mode: screen;
+  animation: blobFloat 18s ease-in-out infinite alternate;
+}
+.blob.b1 {
+  width: 55vmax; height: 55vmax;
+  left: -12vmax; top: -16vmax;
+  background: radial-gradient(circle, rgba(76, 201, 240, 0.55), rgba(47, 128, 237, 0.15) 60%, transparent 75%);
+}
+.blob.b2 {
+  width: 48vmax; height: 48vmax;
+  right: -14vmax; bottom: -12vmax;
+  background: radial-gradient(circle, rgba(45, 212, 167, 0.5), rgba(30, 42, 71, 0.1) 60%, transparent 75%);
+  animation-duration: 22s;
+}
+.blob.b3 {
+  width: 40vmax; height: 40vmax;
+  left: 34vw; top: 22vh;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.3), transparent 70%);
+  animation-duration: 26s;
+}
+@keyframes blobFloat {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(6vmax, -4vmax, 0) scale(1.12); }
+  100% { transform: translate3d(-5vmax, 5vmax, 0) scale(0.95); }
+}
+
+.bg-symbols .sym {
+  position: absolute;
+  bottom: -60px;
+  color: rgba(216, 231, 255, 0.12);
+  font-weight: 800;
+  user-select: none;
+  animation: symDrift linear infinite;
+}
+@keyframes symDrift {
+  from { transform: translate3d(0, 0, 0) rotate(-8deg); opacity: 0; }
+  10%  { opacity: 0.7; }
+  90%  { opacity: 0.5; }
+  to   { transform: translate3d(30px, -115vh, 0) rotate(12deg); opacity: 0; }
+}
+
+.bg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* Rank mode: tint the background toward red to match the evil theme. */
+body.rank-active .blob.b1 {
+  background: radial-gradient(circle, rgba(248, 113, 113, 0.5), rgba(220, 38, 38, 0.15) 60%, transparent 75%);
+}
+body.rank-active .blob.b2 {
+  background: radial-gradient(circle, rgba(248, 113, 113, 0.4), rgba(30, 42, 71, 0.1) 60%, transparent 75%);
+}
+body.rank-active .bg-symbols .sym { color: rgba(255, 205, 205, 0.14); }
+
+/* Respect reduced-motion: freeze the animated background. */
+@media (prefers-reduced-motion: reduce) {
+  .blob { animation: none; }
+  .bg-symbols .sym { animation: none; }
+  .bg-canvas { display: none; }
 }
 
 .menu-card h1, .results-card h1 {
