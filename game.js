@@ -1450,7 +1450,7 @@ function toggleContinent(head) {
   updateContinentCounts();
 }
 
-// Refresh each continent heading's "selected / total" badge.
+// Refresh each continent heading's checkbox + "selected / total" badge.
 function updateContinentCounts() {
   document.querySelectorAll(".country-continent").forEach(head => {
     let total = 0, sel = 0;
@@ -1464,6 +1464,11 @@ function updateContinentCounts() {
     }
     const badge = head.querySelector(".cont-count");
     if (badge) badge.textContent = sel + "/" + total;
+    const check = head.querySelector(".cont-check");
+    if (check) {
+      check.checked = total > 0 && sel === total;
+      check.indeterminate = sel > 0 && sel < total;
+    }
   });
 }
 
@@ -1485,10 +1490,15 @@ function renderCountryList() {
     const head = document.createElement("div");
     head.className = "country-continent";
     head.dataset.continent = cont;
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.className = "cont-check";
+    check.addEventListener("change", () => toggleContinent(head));
     const name = document.createElement("span");
     name.textContent = cont;
     const badge = document.createElement("span");
     badge.className = "cont-count";
+    head.appendChild(check);
     head.appendChild(name);
     head.appendChild(badge);
     container.appendChild(head);
@@ -1683,10 +1693,12 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   $("#countryAllBtn").addEventListener("click", () => setAllCountries(true));
   $("#countryNoneBtn").addEventListener("click", () => setAllCountries(false));
-  // Clicking a continent heading toggles every country in it.
+  // Clicking a continent heading toggles every country in it. Clicking the
+  // heading's own checkbox is handled by its change event, so ignore it here
+  // to avoid toggling twice.
   document.addEventListener("click", e => {
     const head = e.target.closest && e.target.closest(".country-continent");
-    if (head) {
+    if (head && !e.target.closest(".cont-check")) {
       e.preventDefault();
       toggleContinent(head);
     }

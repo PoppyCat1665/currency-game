@@ -1135,7 +1135,13 @@ body.rank-active .credit { color: #a06a6a; }
   color: var(--muted);
   letter-spacing: 0;
 }
-.country-continent::before { content: "▾"; font-size: 10px; opacity: 0.6; }
+.country-continent .cont-check {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 .country-toggle {
   display: flex;
   align-items: center;
