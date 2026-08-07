@@ -567,6 +567,36 @@ function resetCountryClasses() {
       .classed("wrong", false);
 }
 
+// JS-driven answer pulse: rapidly flashes the revealed countries' fill so the
+// correct/wrong colors are clearly visible (works even if CSS fill animation
+// is unsupported). Respects the "Pulse Answer Colors" setting.
+let flashTimer = null;
+function flashAnswer(ids, kind) {
+  if (flashTimer) { clearInterval(flashTimer); flashTimer = null; }
+  if (!game || !game.pulse) return;
+  const root = getComputedStyle(document.documentElement);
+  const base = root.getPropertyValue(kind === "correct" ? "--good" : "--bad").trim();
+  const peak = root.getPropertyValue(kind === "correct" ? "--good-pulse" : "--bad-pulse").trim();
+  if (!base) return;
+  const targets = mapG.selectAll("path.country").filter(d => ids.includes(d.id));
+  let on = false;
+  let n = 0;
+  flashTimer = setInterval(() => {
+    targets.style("fill", on ? peak : base);
+    on = !on;
+    if (++n >= 5) {
+      clearInterval(flashTimer);
+      flashTimer = null;
+      targets.style("fill", null);   // let the class color show again
+    }
+  }, 140);
+}
+
+function clearFlash() {
+  if (flashTimer) { clearInterval(flashTimer); flashTimer = null; }
+  mapG.selectAll("path.country").style("fill", null);
+}
+
 function markCountries(ids, className) {
   mapG.selectAll("path.country")
       .filter(d => ids.includes(d.id))
@@ -796,6 +826,7 @@ function resetGameScreen() {
   // Clear answer markers and country highlight colors.
   if (highlightG) highlightG.selectAll("g.hl").remove();
   resetCountryClasses();
+  clearFlash();
 
   // Clear feedback and tooltip.
   hideFeedback();
@@ -912,6 +943,7 @@ function startGame() {
     showFullName,
     showCountryNames,
     tapSelect,
+    pulse: $("#pulseToggleInput").checked,
     rankMode,
     examMode,
     playerName,
@@ -1041,6 +1073,7 @@ function showQuestion() {
   $("#progress").textContent = `${game.index + 1} / ${game.total}`;
 
   resetCountryClasses();
+  clearFlash();
   hideFeedback();
 
   // Cheat mode (local only): auto-circle the correct country for dev.
@@ -1135,6 +1168,7 @@ function resolveQuestion(clickedId) {
   // ---------- Wrong guess ----------
   markCountries([clickedId], "wrong");
   markCircles([clickedId], "wrong");
+  flashAnswer([clickedId], "wrong");
   playSound("wrong");
 
   if (game.rankMode) {
@@ -1174,6 +1208,7 @@ function finishQuestion(q) {
   // Highlight correct answer with fill + circle ring.
   markCountries(q.countries, "correct");
   markCircles(q.countries, "correct");
+  flashAnswer(q.countries, "correct");
 
   // Always reveal the full currency name once the answer is in.
   $("#currencyBox").classList.remove("code-only");
@@ -1266,6 +1301,7 @@ window.addEventListener("error", ev => {
 // forced hard values (5s, interval off, 1 guess, 250 km radius) and the whole
 // menu turns red. Switching OFF restores the user's previous inputs.
 const RANK_BODY_CLASS = "rank-active";
+let rankWasActive = false;   // whether rank mode was active on the previous apply call
 
 // Sizes of the two question pools, used to bound the Rounds input.
 const EXAM_LIST = new Set(EXAM_CURRENCIES);
@@ -1308,9 +1344,9 @@ function applyRankMenuState() {
   ];
 
   if (ranked) {
-    // Store the user's casual values the first time they switch on, so we can
-    // restore them when rank mode is turned off.
-    if (guess.dataset.pref === undefined) {
+    // Store the user's casual values only when actually turning rank ON, so we
+    // can restore them when rank is turned OFF.
+    if (!rankWasActive) {
       guess.dataset.pref = guess.value;
       guesses.dataset.pref = guesses.value;
       radius.dataset.pref = radius.value;
@@ -1339,7 +1375,8 @@ function applyRankMenuState() {
       el.classList.add("locked");
     });
   } else {
-    if (guess.dataset.pref !== undefined) {
+    // Restore the user's casual values only when actually turning rank OFF.
+    if (rankWasActive && guess.dataset.pref !== undefined) {
       guess.value = guess.dataset.pref;
       guesses.value = guesses.dataset.pref;
       radius.value = radius.dataset.pref;
@@ -1360,6 +1397,7 @@ function applyRankMenuState() {
     });
   }
 
+  rankWasActive = ranked;
   document.body.classList.toggle(RANK_BODY_CLASS, ranked);
   syncRoundsMax();
   syncIntervalState();
@@ -1864,14 +1902,14 @@ function applyTheme() {
   // Normal palette
   root.setProperty("--accent", normal);
   root.setProperty("--accent-strong", shade(normal, -0.18));
-  root.setProperty("--good", shade(normal, 0.25));          // Correct = light shade
-  root.setProperty("--good-pulse", shade(normal, 0.55));    // brighter flash
-  root.setProperty("--bad", shade(normal, -0.25));          // Wrong = dark shade
-  root.setProperty("--bad-pulse", shade(normal, 0.10));     // brighter flash
+  root.setProperty("--good", shade(normal, 0.20));          // Correct = light shade
+  root.setProperty("--good-pulse", shade(normal, 0.92));    // near-white flash
+  root.setProperty("--bad", shade(normal, -0.35));          // Wrong = dark shade
+  root.setProperty("--bad-pulse", shade(normal, 0.35));     // much lighter flash
   root.setProperty("--border", shade(normal, -0.12));
   root.setProperty("--acc-rgb", rgbStr(acc));
-  root.setProperty("--good-rgb", rgbStr(hexToRgb(shade(normal, 0.25))));
-  root.setProperty("--bad-rgb", rgbStr(hexToRgb(shade(normal, -0.25))));
+  root.setProperty("--good-rgb", rgbStr(hexToRgb(shade(normal, 0.20))));
+  root.setProperty("--bad-rgb", rgbStr(hexToRgb(shade(normal, -0.35))));
   root.setProperty("--primary-shadow", `rgba(${rgbStr(acc)}, 0.35)`);
   root.setProperty("--toggle-bg", `rgba(${rgbStr(acc)}, 0.25)`);
   // Map tints (dark, desaturated for legibility)
@@ -1930,7 +1968,8 @@ document.addEventListener("DOMContentLoaded", () => {
   syncIntervalState();
   $("#rankModeInput").addEventListener("change", applyRankMenuState);
 
-  // Save any changed casual setting as soon as it changes.
+  // Save any changed casual setting as soon as it changes (on both change and
+  // input, so nothing is lost even if the settings panel is closed abruptly).
   [
     "guessTimeInput", "intervalToggleInput", "intervalTimeInput",
     "maxGuessesInput", "snapRadiusInput", "roundsInput",
@@ -1939,7 +1978,9 @@ document.addEventListener("DOMContentLoaded", () => {
     "themeNormalInput", "themeRankInput"
   ].forEach(id => {
     const el = $(id);
-    if (el) el.addEventListener("change", saveSettings);
+    if (!el) return;
+    el.addEventListener("change", saveSettings);
+    el.addEventListener("input", saveSettings);
   });
 
   // Re-apply the theme live as the color pickers change.

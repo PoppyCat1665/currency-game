@@ -10,8 +10,8 @@
   --accent: #4cc9f0;
   --good: #2dd4a7;
   --bad: #f87171;
-  --good-pulse: #eafff6;
-  --bad-pulse: #ffdada;
+  --good-pulse: #ffffff;
+  --bad-pulse: #ffb3b3;
   --border: #33447a;
   --accent-strong: var(--accent-strong);
   --primary-shadow: var(--primary-shadow);
@@ -549,29 +549,15 @@ input[type="number"] {
 .country.correct { fill: var(--good); stroke: #eafff6; stroke-width: 0.7; }
 .country.wrong   { fill: var(--bad); stroke: #ffe4e4; stroke-width: 0.7; }
 
-/* Pulse the answered country so the player clearly sees which was right/wrong.
-   Pulsing the FILL color (not just a brightness filter) is much more visible. */
-@keyframes correctPulse {
-  0%, 100% { fill: var(--good); }
-  50%      { fill: var(--good-pulse); }
-}
-@keyframes wrongPulse {
-  0%, 100% { fill: var(--bad); }
-  50%      { fill: var(--bad-pulse); }
-}
-.country.correct { animation: correctPulse 0.6s ease-in-out 3; }
-.country.wrong   { animation: wrongPulse 0.6s ease-in-out 3; }
-
-/* The answer ring flashes too for extra visibility. */
+/* The answer ring flashes too for extra visibility. (The country FILL pulse is
+   driven by JS in flashAnswer(), which renders reliably on every device.) */
 @keyframes ringPulse {
   0%, 100% { stroke-opacity: 1; }
   50%      { stroke-opacity: 0.25; }
 }
 .hl circle { animation: ringPulse 0.6s ease-in-out 3; }
 
-/* When the "Pulse Answer Colors" setting is off, disable the pulse animations. */
-body.no-pulse .country.correct,
-body.no-pulse .country.wrong,
+/* When the "Pulse Answer Colors" setting is off, disable the ring pulse. */
 body.no-pulse .hl circle { animation: none; }
 
 /* Theme color pickers in settings. */
