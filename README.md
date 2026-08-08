@@ -1,15 +1,13 @@
 # 🌍 Currency Guessing Game
 
-A fast study tool to memorize currencies and their countries before 🐻 exam.
+A fast study tool to memorize currencies and their countries before currency exam.
 
-Play it here: **https://PoppyCat1665.github.io/currency-game/**
+Play it here: **https://poppycat1665.github.io/currency-game/**
 
 ## Features
 - Interactive world map
-- Guess the country for a given currency
-- Customizable guess time, interval time, max guesses
+- Customizable guess time, rounds, max guesses, country list, almost everything
 - Adjustable click radius (in km) so small countries are easier to hit
-- Sound effects
 - Score tracking with detailed results
 
 ## Credits
