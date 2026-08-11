@@ -2535,7 +2535,6 @@ function openRankPicker() {
   }
   // Currency pool size: all available currencies.
   $("#rankAllCount").textContent = FULL_COUNT;
-  $("#rankAllSub").textContent = "every available currency";
   openOverlay("rankPicker");
 }
 
