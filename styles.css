@@ -506,7 +506,8 @@ input[type="number"] {
 
 /* ---------- Feedback ---------- */
 /* Absolutely positioned so showing a guess notification never pushes the map
-   down or shrinks it — it overlays the top edge of the map instead. */
+   down or shrinks it — it overlays the top edge of the map instead. Solid
+   background keeps it readable over the map. */
 .feedback {
   position: absolute;
   top: calc(100% - 6px);
@@ -514,32 +515,50 @@ input[type="number"] {
   transform: translateX(-50%);
   z-index: 30;
   text-align: center;
-  font-size: 16px;
-  font-weight: 700;
-  padding: 8px 14px;
-  border-radius: 10px;
+  font-size: 17px;
+  font-weight: 800;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border-width: 2px;
   white-space: nowrap;
-  max-width: 90%;
+  max-width: 92%;
   overflow: hidden;
   text-overflow: ellipsis;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
 }
 
 .feedback.ok {
-  background: rgba(var(--good-rgb), 0.15);
+  background: rgba(8, 24, 19, 0.95);
   color: var(--good);
-  border: 1px solid rgba(var(--good-rgb), 0.4);
+  border: 2px solid var(--good);
 }
 
 .feedback.no {
-  background: rgba(var(--bad-rgb), 0.15);
+  background: rgba(28, 10, 10, 0.95);
   color: var(--bad);
-  border: 1px solid rgba(var(--bad-rgb), 0.4);
+  border: 2px solid var(--bad);
 }
 
 .feedback.info {
-  background: rgba(251, 191, 36, 0.15);
+  background: rgba(28, 22, 4, 0.95);
   color: var(--warn);
-  border: 1px solid rgba(251, 191, 36, 0.4);
+  border: 2px solid var(--warn);
+}
+
+/* Interval wait overlays the map too, so enabling it never pushes or shrinks
+   the map. Rendered below the feedback notification. */
+#intervalSection {
+  position: absolute;
+  top: calc(100% + 50px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(640px, 94%);
+  z-index: 29;
+  background: rgba(10, 18, 36, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 /* ---------- Map ---------- */
@@ -1175,8 +1194,24 @@ body.rank-active .credit { color: var(--rank-faint); }
   display: flex;
   flex-direction: column;
   gap: 14px;
-  margin: 24px 0;
+  margin: 24px 0 12px;
 }
+
+/* The RANKED switch: always ranked-colored, spans the menu width. */
+.mode-switch {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 14px;
+  justify-content: center;
+}
+.mode-switch .rank-label { font-size: 18px; letter-spacing: 2px; }
+
+/* Each subject has its own row: main button + ranked button side by side. */
+.mode-row {
+  display: flex;
+  gap: 10px;
+}
+.mode-row .mode-btn { flex: 1; }
 
 .mode-btn {
   width: 100%;
@@ -1236,7 +1271,7 @@ body.rank-active .credit { color: var(--rank-faint); }
 .settings-panel {
   width: 100%;
   max-width: 720px;
-  max-height: 88vh;
+  height: min(640px, 84vh);
   display: flex;
   flex-direction: column;
   background: var(--card);
@@ -1424,6 +1459,41 @@ body.rank-active .credit { color: var(--rank-faint); }
 .country-toggle input { flex-shrink: 0; accent-color: var(--accent); width: 16px; height: 16px; }
 .country-toggle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Question Lists category: two stacked list managers (Country + State). */
+.question-list-block {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.question-list-block h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: var(--accent);
+}
+.question-list-block + .question-list-block { margin-top: 14px; }
+.question-list-block .country-list { max-height: 220px; }
+.question-list-block .country-toggle { font-size: 12px; }
+
+.setting select.setting-select,
+.setting-select {
+  background: #0d1530;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+/* Main menu: subject subtitle under the two big buttons. */
+.mode-subtitle {
+  margin: -14px 0 20px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
 /* Responsive: settings nav becomes tabs on smaller screens */
 @media (max-width: 640px) {
   .settings-body { flex-direction: column; }
@@ -1441,7 +1511,7 @@ body.rank-active .credit { color: var(--rank-faint); }
 }
 
 /* ================= Rank mode picker ================= */
-.rank-picker { max-width: 420px; }
+.rank-picker { max-width: 420px; height: auto; }
 
 .rank-options {
   display: flex;

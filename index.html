@@ -21,24 +21,28 @@
     </div>
 
     <div class="menu-card">
-      <h1>🌍 Currency Guessing</h1>
-      <p class="subtitle">A fast study tool to memorize currencies and their countries before your MED exam.</p>
-
-      <!-- Hidden input drives rank mode. Set by the PLAY / RANKED buttons. -->
-      <input id="rankModeInput" type="checkbox" class="hidden">
+      <h1>PoppyCat1665's Test Practice Site</h1>
+      <p class="subtitle">A fast study tool to memorize currencies and U.S. states before your MED exam.</p>
 
       <div class="mode-buttons">
-        <button id="playBtn" class="btn primary mode-btn">▶ &nbsp;PLAY</button>
-        <button id="rankedBtn" class="btn ranked mode-btn">😈 &nbsp;RANKED</button>
+        <label class="rank-toggle mode-switch" for="rankModeInput">
+          <span class="rank-label">😈 RANKED</span>
+          <input id="rankModeInput" type="checkbox">
+        </label>
+        <div class="mode-row">
+          <button id="currencyBtn" class="btn primary mode-btn">🌍 &nbsp;CURRENCY</button>
+          <button id="statesBtn" class="btn primary mode-btn">🇺🇸 &nbsp;U.S. STATES</button>
+        </div>
       </div>
+      <p class="mode-subtitle">Guess countries by currency — or identify U.S. states on a map. Toggle RANKED for a hardcore run.</p>
 
       <button id="settingsBtn" class="btn ghost">⚙ &nbsp;SETTINGS</button>
       <button id="replayBtn" class="btn ghost">🎬 &nbsp;REPLAY</button>
       <input id="replayFileInput" type="file" accept="application/json,.json" class="hidden">
 
-      <p class="hint">You'll be shown a currency – click the country that uses it before time runs out.</p>
+      <p class="hint">Pick a subject, then click the correct country or state before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v3.15</p>
+      <p class="version" id="appVersion">v3.16-dev6</p>
     </div>
   </div>
 
@@ -53,13 +57,13 @@
       <div class="settings-body">
         <nav class="settings-nav" id="settingsNav">
           <button class="cat-btn active" data-cat="gameplay">Gameplay</button>
+          <button class="cat-btn" data-cat="questionlists">Question Lists</button>
           <button class="cat-btn" data-cat="display">Display</button>
           <button class="cat-btn" data-cat="map">Map</button>
           <button class="cat-btn" data-cat="audio">Audio</button>
           <button class="cat-btn" data-cat="study">Study</button>
-          <button class="cat-btn" data-cat="countries">Countries</button>
-          <button class="cat-btn" data-cat="theme">Theme</button>
           <button class="cat-btn" data-cat="player">Player</button>
+          <button class="cat-btn" data-cat="other">Other</button>
         </nav>
 
         <div class="settings-content">
@@ -114,6 +118,17 @@
               <input id="pulseToggleInput" type="checkbox" checked disabled>
             </label>
             <p class="setting-note" id="pulseNote">Unavailable — the answer pulse only plays when there's no interval wait, so turn off Interval Wait to use it.</p>
+            <label class="setting toggle">
+              <span>Background Effects</span>
+              <input id="bgEffectsInput" type="checkbox" checked>
+            </label>
+            <label class="setting">
+              <span>Background Effects Rate</span>
+              <span class="info-icon" data-info="Only usable while Background Effects is on">ⓘ</span>
+              <input id="bgRateInput" type="number" min="0" max="300" step="10" value="100">
+              <span class="unit">%</span>
+            </label>
+            <p class="setting-note">Speed of the menu's floating currency symbols, particle network, and gradient blobs. Set to 0 to turn them all off.</p>
           </section>
 
           <section class="cat-section" data-section="map">
@@ -149,22 +164,37 @@
             <p class="setting-note">Practice under conditions similar to your test, using only the classic study list.</p>
           </section>
 
-          <section class="cat-section" data-section="countries">
-            <h3>Countries</h3>
-            <div class="country-filter-bar">
-              <input id="countrySearch" type="text" placeholder="Search countries…">
-              <div class="country-filter-actions">
-                <button id="countryAllBtn" class="btn tiny">All</button>
-                <button id="countryNoneBtn" class="btn tiny">None</button>
+          <section class="cat-section" data-section="questionlists">
+            <h3>Question Lists</h3>
+            <div class="question-list-block">
+              <h4>🌍 Country List</h4>
+              <div class="country-filter-bar">
+                <input id="countrySearch" type="text" placeholder="Search countries…">
+                <div class="country-filter-actions">
+                  <button id="countryAllBtn" class="btn tiny">All</button>
+                  <button id="countryNoneBtn" class="btn tiny">None</button>
+                </div>
               </div>
+              <div id="countryList" class="country-list"></div>
+              <p class="setting-note">Currency Mode only asks about the enabled countries. Disabled countries never appear. Ignored in Ranked and Exam mode.</p>
+              <p class="setting-note hidden" id="countriesDisabledNote">Disabled while 📚 Exam Mode is on.</p>
             </div>
-            <div id="countryList" class="country-list"></div>
-            <p class="setting-note">Only currencies used by the toggled-on countries appear. Ignored in Ranked and Exam mode.</p>
-            <p class="setting-note hidden" id="countriesDisabledNote">Disabled while 📚 Exam Mode is on.</p>
+            <div class="question-list-block">
+              <h4>🇺🇸 State List</h4>
+              <div class="country-filter-bar">
+                <input id="stateSearch" type="text" placeholder="Search states…">
+                <div class="country-filter-actions">
+                  <button id="stateAllBtn" class="btn tiny">All</button>
+                  <button id="stateNoneBtn" class="btn tiny">None</button>
+                </div>
+              </div>
+              <div id="stateList" class="country-list"></div>
+              <p class="setting-note"><span id="stateCount"></span> — U.S. States Mode only asks about the enabled states.</p>
+            </div>
           </section>
 
-          <section class="cat-section" data-section="theme">
-            <h3>Theme</h3>
+          <section class="cat-section" data-section="other">
+            <h3>Other</h3>
             <label class="setting color-setting">
               <span>Normal Mode Color</span>
               <input id="themeNormalInput" type="color" value="#4cc9f0">
@@ -174,6 +204,13 @@
               <input id="themeRankInput" type="color" value="#ef4444">
             </label>
             <p class="setting-note">Recolors the whole app — buttons, borders, map blobs, and answer colors. Correct uses a light shade and Wrong a dark shade of your color.</p>
+            <label class="setting">
+              <span>Language</span>
+              <select id="languageInput" class="setting-select">
+                <option value="en">English</option>
+              </select>
+            </label>
+            <p class="setting-note">More languages coming soon.</p>
           </section>
 
           <section class="cat-section" data-section="player">
@@ -195,7 +232,7 @@
     </div>
   </div>
 
-  <!-- ========== RANK MODE PICKER ========== -->
+  <!-- ========== RANK MODE PICKER (currency only) ========== -->
   <div id="rankPicker" class="settings-overlay hidden">
     <div class="settings-panel rank-picker">
       <div class="settings-header">
@@ -217,7 +254,7 @@
         </button>
         <button class="rank-opt" data-rounds="all">
           RANK <span id="rankAllCount">–</span>
-          <span class="rank-opt-sub">every available currency</span>
+          <span class="rank-opt-sub" id="rankAllSub">every available question</span>
         </button>
       </div>
       <div class="settings-footer">
@@ -328,8 +365,10 @@
   <script src="lib/d3.min.js?v=45"></script>
   <script src="lib/topojson.min.js?v=45"></script>
   <script src="lib/world.js?v=45"></script>
+  <script src="lib/us.js?v=45"></script>
   <script src="continents.js?v=45"></script>
   <script src="data.js?v=45"></script>
+  <script src="states.js?v=45"></script>
   <script src="game.js?v=45"></script>
 </body>
 </html>

@@ -173,11 +173,89 @@ let countryList = [];
 // Only applies to casual (non-rank, non-exam) play.
 const selectedCountries = new Set();
 
+// ===== Subject (Currency world map vs U.S. States map) =====
+// The active subject ("currency" | "states"). The world-map globals above
+// (countryFeatures/countryBoundaries/countryById/countryList) are re-pointed
+// to the state datasets when the subject is "states", so every map function
+// (labels, hit-testing, rings, names) works for both maps unchanged.
+let gameSubject = "currency";
+
+// Frozen world datasets (built once in initMap) so we can swap back to them.
+let worldFeatures = [];
+let worldBoundaries = [];
+let worldById = new Map();
+let worldList = [];
+
+// U.S. states datasets (built once in initUsMap).
+let stateFeatures = [];
+let stateBoundaries = [];
+let stateById = new Map();
+let stateList = [];
+
+// U.S. states data, loaded once from lib/us.js + states.js.
+const US_STATE_BY_ID = new Map();   // FIPS id (string) -> { code, name, abbr }
+const US_STATE_LIST = [];           // sorted [{ code, name, abbr }]
+const selectedStates = new Set();   // FIPS ids toggled in the State List
+
+// Build the U.S. states datasets from the topojson + states.js data.
+function buildStateData() {
+  const features = topojson.feature(US_TOPOJSON, US_TOPOJSON.objects.states).features;
+  const byCode = new Map(US_STATES.map(s => [s.code, s]));
+  features.forEach(f => {
+    const meta = byCode.get(String(f.id));
+    if (!meta) return;
+    f.id = String(f.id);
+    f.properties = { ...(f.properties || {}), name: meta.name };
+    US_STATE_BY_ID.set(f.id, meta);
+  });
+
+  stateFeatures = features.filter(f => US_STATE_BY_ID.has(String(f.id)));
+  stateById = new Map([...US_STATE_BY_ID.entries()].map(([id, m]) => [id, m.name]));
+  stateList = stateFeatures
+    .map(f => ({ id: f.id, name: f.properties.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  US_STATE_LIST.length = 0;
+  US_STATE_LIST.push(...stateList.map(s => ({ ...US_STATE_BY_ID.get(s.id) })));
+  US_STATE_LIST.sort((a, b) => a.name.localeCompare(b.name));
+
+  stateBoundaries = stateFeatures.map(f => {
+    const geom = f.geometry;
+    const polys = geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates];
+    const pts = [];
+    for (const poly of polys) {
+      const ring = poly[0];
+      if (!ring) continue;
+      const step = Math.max(1, Math.floor(ring.length / 40));
+      for (let i = 0; i < ring.length; i += step) pts.push(ring[i]);
+    }
+    return pts;
+  });
+}
+
+// Point the "active" map globals at the given subject's data.
+function activateSubject(subject) {
+  gameSubject = subject;
+  if (subject === "states") {
+    countryFeatures = stateFeatures;
+    countryBoundaries = stateBoundaries;
+    countryById = stateById;
+    countryList = stateList;
+  } else {
+    countryFeatures = worldFeatures;
+    countryBoundaries = worldBoundaries;
+    countryById = worldById;
+    countryList = worldList;
+  }
+}
+
 // localStorage key for persisting all settings.
 const SETTINGS_KEY = "currencyGameSettings_v1";
 
-function buildCountryBoundaries() {
-  countryBoundaries = countryFeatures.map(f => {
+// Build a sampled boundary-points array for a set of geo features (one entry
+// per feature, aligned by index). Used for the km-radius hit test.
+function buildBoundariesFor(features) {
+  return features.map(f => {
     const geom = f.geometry;
     const polys = geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates];
     const pts = [];
@@ -189,6 +267,10 @@ function buildCountryBoundaries() {
     }
     return pts;
   });
+}
+
+function buildCountryBoundaries() {
+  countryBoundaries = buildBoundariesFor(countryFeatures);
 }
 
 // Great-circle distance in km between two [lon, lat] points.
@@ -205,6 +287,8 @@ function haversineKm(a, b) {
 function initMap() {
   svg = d3.select("#map");
 
+  // The projection is re-created per subject in setSubject(); default here so
+  // nothing breaks if resizeMap runs before a subject is chosen.
   projection = d3.geoNaturalEarth1();
   path = d3.geoPath(projection);
 
@@ -276,7 +360,7 @@ function initMap() {
   const clip = svg.append("defs").append("clipPath").attr("id", "labelClipPath");
   labelClip = clip.append("rect");
 
-  // Sphere + graticule
+  // Sphere + graticule (world map only; hidden for the US states map).
   mapG.append("path")
       .attr("class", "sphere")
       .attr("pointer-events", "none");
@@ -284,7 +368,8 @@ function initMap() {
       .attr("class", "graticule")
       .attr("pointer-events", "none");
 
-  // Countries
+  // Build both datasets once. The active subject points countryFeatures & co.
+  // at one of them; the other stays frozen for instant switching.
   const topo = WORLD_TOPOJSON;
   const features = topojson.feature(topo, topo.objects.countries).features;
 
@@ -293,10 +378,46 @@ function initMap() {
     const numId = Number(f.id);
     if (Number.isNaN(numId)) return;
     f.id = numId;
-    countryById.set(numId, f.properties.name);
+    worldById.set(numId, f.properties.name);
   });
 
-  countryFeatures = features.filter(f => Number.isInteger(f.id));
+  worldFeatures = features.filter(f => Number.isInteger(f.id));
+  worldBoundaries = buildBoundariesFor(worldFeatures);
+  worldList = worldFeatures
+    .map(f => ({ id: f.id, name: f.properties.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  buildStateData();
+
+  // Draw the currently selected subject's map.
+  setSubject(gameSubject);
+
+  window.addEventListener("resize", debounce(resizeMap, 150));
+
+  resizeMap();
+
+  $("#mapLoading").classList.add("hidden");
+}
+
+// Switch the active map between "currency" (world) and "states" (US).
+// Re-points the active feature globals and re-renders the map paths.
+function setSubject(subject) {
+  if (subject !== "states") subject = "currency";
+  activateSubject(subject);
+  if (!mapG) return;
+
+  const isStates = subject === "states";
+
+  // Ocean/sphere/graticule are world-only decorations.
+  mapG.select(".ocean").style("display", isStates ? "none" : "");
+  mapG.select(".sphere").style("display", isStates ? "none" : "");
+  mapG.select(".graticule").style("display", isStates ? "none" : "");
+
+  // The projection changes shape entirely between maps.
+  projection = isStates
+    ? d3.geoAlbersUsa()
+    : d3.geoNaturalEarth1();
+  path = d3.geoPath(projection);
 
   mapG.selectAll("path.country")
       .data(countryFeatures, d => d.id)
@@ -305,26 +426,21 @@ function initMap() {
       .attr("data-id", d => d.id)
       .attr("pointer-events", "visible")
       .on("mousemove", ev => moveTooltip(ev))
-      .on("mouseover", (ev, d) => showTooltip(ev, d.properties.name))
+      .on("mouseover", (ev, d) => showTooltip(ev, nameOf(d.id)))
       .on("mouseout", hideTooltip);
 
-  // The highlight group was created before the countries were appended to
-  // mapG, so it ended up underneath them. Re-append it last so answer rings
-  // always render on top of the world map.
   highlightG.raise();
 
   buildCountryBoundaries();
 
-  // Build the sorted country list used by the Country toggle in settings.
-  countryList = countryFeatures
-    .map(f => ({ id: f.id, name: f.properties.name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  window.addEventListener("resize", debounce(resizeMap, 150));
-
-  resizeMap();
-
-  $("#mapLoading").classList.add("hidden");
+  // Reset zoom for the new map.
+  if (zoomBehavior && svg) {
+    try {
+      svg.call(zoomBehavior.transform, d3.zoomIdentity);
+    } catch (e) { /* SVG transform unavailable (e.g. jsdom) — ignore */ }
+  }
+  currentZoom = null;
+  if (typeof resizeMap === "function") resizeMap();
 }
 
 function resizeMap() {
@@ -348,7 +464,13 @@ function resizeMap() {
   // Clip labels to the visible viewport.
   labelClip.attr("x", 0).attr("y", 0).attr("width", width).attr("height", height);
 
-  projection.fitSize([width, height], { type: "Sphere" });
+  // Fit the projection to the map: world fits the sphere, US fits the states.
+  if (gameSubject === "states") {
+    const usFeature = topojson.feature(US_TOPOJSON, US_TOPOJSON.objects.states);
+    projection.fitSize([width, height], usFeature);
+  } else {
+    projection.fitSize([width, height], { type: "Sphere" });
+  }
   path = d3.geoPath(projection);
 
   // Base draw — update in one go with the new projection.
@@ -908,14 +1030,16 @@ function startGame() {
   const rankMode = $("#rankModeInput").checked;
   const playerName = $("#playerNameInput").value.trim();
 
-  // Rank mode forces hard settings.
-  const guessSec = rankMode ? 5 : Math.max(1, parseInt($("#guessTimeInput").value, 10) || 7);
-  const intervalEnabled = rankMode ? false : $("#intervalToggleInput").checked;
+  // Rank mode means "how many rounds you play" — it does NOT change the
+  // difficulty. All settings (time, guesses, interval, hints) come from the
+  // normal casual settings; only the round count differs.
+  const guessSec = Math.max(1, parseInt($("#guessTimeInput").value, 10) || 7);
+  const intervalEnabled = $("#intervalToggleInput").checked;
   const intervalSec = intervalEnabled
     ? Math.max(0, parseInt($("#intervalTimeInput").value, 10) || 3)
     : 0; // interval off -> skip straight to the next round
-  const maxGuesses = rankMode ? 1 : Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
-  const snapRadiusKm = rankMode ? 250 : Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
+  const maxGuesses = Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
+  const snapRadiusKm = Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
 
   // Read display & sound preferences for this session
   const showFullName = $("#showFullNameInput").checked;
@@ -936,29 +1060,57 @@ function startGame() {
   // Browsers block audio until a user gesture; Start click counts as one.
   ensureAudio();
 
-  // Build the question pool from the real currency data. In 📚 Exam mode,
-  // restrict to ONLY the classic study list (EXAM_CURRENCIES). Otherwise use
-  // every currency in data.js.
-  // Number of rounds: clamp to 1 .. number of available questions. The menu
-  // sets the default (EXAM_COUNT in 📚 mode, 40 in normal mode); max = the
-  // size of the active pool.
-  let questions = CURRENCIES.map(c => ({ ...c }));
-  if (examMode) {
-    const examSet = new Set(EXAM_CURRENCIES);
-    questions = questions.filter(c => examSet.has(c.code));
+  // ----- Build the question pool for the active subject -----
+  let questions;
+
+  if (gameSubject === "states") {
+    // U.S. States mode: each enabled state is a question. The answer target
+    // is the state's own FIPS id (single state per question). The currency
+    // box shows the state's name / abbreviation.
+    const activeStates = selectedStates.size > 0
+      ? US_STATE_LIST.filter(s => selectedStates.has(s.code))
+      : US_STATE_LIST;
+    if (activeStates.length === 0) {
+      showToast("⚠ No states selected — enable at least one state in Settings → Question Lists → State List", false);
+      return;
+    }
+    questions = activeStates.map(s => ({
+      code: s.abbr,
+      name: s.name,
+      symbol: s.abbr,
+      countries: [s.code]       // the FIPS id of the state itself
+    }));
+  } else {
+    // Currency mode: build from the real currency data. In 📚 Exam mode,
+    // restrict to ONLY the classic study list (EXAM_CURRENCIES). Otherwise use
+    // every currency in data.js.
+    questions = CURRENCIES.map(c => ({ ...c }));
+    if (examMode) {
+      const examSet = new Set(EXAM_CURRENCIES);
+      questions = questions.filter(c => examSet.has(c.code));
+    }
+    // Country toggle: only in casual (not ranked, not exam). Restrict to
+    // currencies used by the toggled-on countries, if any are unselected.
+    if (!rankMode && !examMode && selectedCountries.size > 0 && selectedCountries.size < countryList.length) {
+      questions = questions.filter(q => q.countries.some(id => selectedCountries.has(id)));
+    }
+    if (questions.length === 0) {
+      showToast("⚠ No countries selected — enable at least one country in Settings → Question Lists → Country List", false);
+      return;
+    }
   }
-  // Country toggle: only in casual (not ranked, not exam). Restrict to
-  // currencies used by the toggled-on countries, if any are unselected.
-  if (!rankMode && !examMode && selectedCountries.size > 0 && selectedCountries.size < countryList.length) {
-    questions = questions.filter(q => q.countries.some(id => selectedCountries.has(id)));
-  }
+
   questions = shuffle(questions);
-  // Rounds: if ranked WITH Exam mode on, just use the full exam list
-  // (EXAM_COUNT rounds). Otherwise ranked uses the chosen rank mode
-  // (50/70/100/all); casual uses the Rounds setting.
-  const roundsRequested = rankMode
-    ? (examMode ? questions.length : (pendingRankRounds === "all" ? questions.length : pendingRankRounds))
-    : Math.max(1, parseInt($("#roundsInput").value, 10) || (examMode ? EXAM_COUNT : 40));
+  // Rounds: ranked plays a chosen count for currency (50/70/100/all) and every
+  // state for states mode. Casual uses the Rounds setting.
+  let roundsRequested;
+  if (rankMode) {
+    roundsRequested = (gameSubject === "states" || pendingRankRounds === "all")
+      ? questions.length
+      : parseInt(pendingRankRounds, 10) || questions.length;
+  } else {
+    roundsRequested = Math.max(1, parseInt($("#roundsInput").value, 10) || 40);
+  }
   const rounds = Math.min(roundsRequested, questions.length);
   questions = questions.slice(0, rounds);
 
@@ -1002,20 +1154,29 @@ function startGame() {
     guessTimerId: null,
     intervalTimerId: null,
     countdownTimerId: null,
-    enabledCountries: {
+    subject: gameSubject,
+    enabledCountries: (() => {
+      // For the US states map, the details panel lists states instead of
+      // countries. Everything else reuses the country machinery below.
+      if (gameSubject === "states") {
+        const active = selectedStates.size > 0
+          ? [...selectedStates]
+          : US_STATE_LIST.map(s => s.code);
+        return { normal: active, ranked: active, exam: active };
+      }
       // In exam mode the toggle selection is temporarily swapped to the exam
       // list, so "Normal Mode" should reflect the user's real selection.
-      normal: (() => {
-        const src = $("#examModeInput").checked && savedCountriesBeforeExam
-          ? savedCountriesBeforeExam
-          : selectedCountries;
-        return (src.size > 0 && src.size < countryList.length)
-          ? [...src]
-          : countryList.map(c => c.id);
-      })(),
-      ranked: countryList.map(c => c.id),
-      exam: [...examCountryIds()]
-    },
+      const normalSrc = $("#examModeInput").checked && savedCountriesBeforeExam
+        ? savedCountriesBeforeExam
+        : selectedCountries;
+      return {
+        normal: (normalSrc.size > 0 && normalSrc.size < countryList.length)
+          ? [...normalSrc]
+          : countryList.map(c => c.id),
+        ranked: countryList.map(c => c.id),
+        exam: [...examCountryIds()]
+      };
+    })(),
     phase: "idle"
   };
 
@@ -1146,7 +1307,13 @@ function showQuestion() {
   } else {
     $("#currencyName").textContent = q.code;
   }
-  $("#currencySymbol").textContent = q.symbol ? `${q.symbol}   ·   ${q.code}` : q.code;
+  // States show just the abbreviation under the name; currencies show the
+  // symbol + code.
+  if (game.subject === "states") {
+    $("#currencySymbol").textContent = q.symbol || "";
+  } else {
+    $("#currencySymbol").textContent = q.symbol ? `${q.symbol}   ·   ${q.code}` : q.code;
+  }
   $("#progress").textContent = `${game.index + 1} / ${game.total}`;
 
   resetCountryClasses();
@@ -1186,7 +1353,11 @@ function resolveQuestion(clickedId) {
       updateStreakPill();
     }
     finishQuestion(q);
-    showFeedback("info", `⏰ Time's up! ${q.name} is used in: ${answerLabelFor(q)}`);
+    if (game.subject === "states") {
+      showFeedback("info", `⏰ Time's up! The answer was: ${q.name}`);
+    } else {
+      showFeedback("info", `⏰ Time's up! ${q.name} is used in: ${answerLabelFor(q)}`);
+    }
     playSound("timeout");
     updateScoreDisplay();
     return;
@@ -1230,13 +1401,21 @@ function resolveQuestion(clickedId) {
       game.score += gained + streakBonus;
 
       showScorePop("+" + (gained + streakBonus), "good-pop");
-      showFeedback("ok", `✅ Correct! ${q.name} → ${shown} (+${speedBonus} speed)`);
+      if (game.subject === "states") {
+        showFeedback("ok", `✅ Correct! ${q.name} (+${speedBonus} speed)`);
+      } else {
+        showFeedback("ok", `✅ Correct! ${q.name} → ${shown} (+${speedBonus} speed)`);
+      }
       playSound("correct");
     } else {
       // Casual: +1 point per correct answer as before.
       game.score++;
       showScorePop("+1", "good-pop");
-      showFeedback("ok", `✅ Correct! ${q.name} → ${shown}`);
+      if (game.subject === "states") {
+        showFeedback("ok", `✅ Correct! ${q.name}`);
+      } else {
+        showFeedback("ok", `✅ Correct! ${q.name} → ${shown}`);
+      }
       playSound("correct");
     }
 
@@ -1271,7 +1450,11 @@ function resolveQuestion(clickedId) {
     // Out of attempts — mark failed and reveal the answer.
     game.incorrect++;
     finishQuestion(q);
-    showFeedback("no", `❌ Out of guesses! ${q.name} is used in: ${answerLabelFor(q)}`);
+    if (game.subject === "states") {
+      showFeedback("no", `❌ Out of guesses! The answer was: ${q.name}`);
+    } else {
+      showFeedback("no", `❌ Out of guesses! ${q.name} is used in: ${answerLabelFor(q)}`);
+    }
     updateScoreDisplay();
   }
 }
@@ -1355,34 +1538,43 @@ function showResults() {
   $("#finalStreak").textContent = game.highestStreak || 0;
   streakStat.classList.remove("hidden");
 
-  // Enabled-country details: only the set that was actually active for this
+  // Enabled-answer details: only the set that was actually active for this
   // game (exam list in exam mode, all in ranked, the toggle selection in
-  // casual), grouped by continent.
+  // casual). Grouped by continent for countries; listed flat for states.
   const ec = game.enabledCountries || { normal: [], ranked: [], exam: [] };
   const activeIds = game.examMode ? ec.exam : (game.rankMode ? ec.ranked : ec.normal);
   const activeNames = activeIds.map(id => nameOf(id)).sort((a, b) => a.localeCompare(b));
 
-  const byCont = {};
-  activeIds.forEach(id => {
-    const cont = COUNTRY_CONTINENT[id] || "Other";
-    (byCont[cont] = byCont[cont] || []).push(id);
-  });
-
   const contEl = $("#detailContinents");
   contEl.innerHTML = "";
-  CONTINENT_ORDER.concat(["Other"]).forEach(cont => {
-    const ids = byCont[cont];
-    if (!ids || ids.length === 0) return;
+  if (game.subject === "states") {
     const head = document.createElement("h4");
-    head.textContent = cont;
+    head.textContent = "United States";
     const names = document.createElement("p");
     names.className = "detail-list";
-    names.textContent = ids.map(nameOf).sort((a, b) => a.localeCompare(b)).join(", ");
+    names.textContent = activeNames.join(", ") || "—";
     contEl.appendChild(head);
     contEl.appendChild(names);
-  });
+  } else {
+    const byCont = {};
+    activeIds.forEach(id => {
+      const cont = COUNTRY_CONTINENT[id] || "Other";
+      (byCont[cont] = byCont[cont] || []).push(id);
+    });
+    CONTINENT_ORDER.concat(["Other"]).forEach(cont => {
+      const ids = byCont[cont];
+      if (!ids || ids.length === 0) return;
+      const head = document.createElement("h4");
+      head.textContent = cont;
+      const names = document.createElement("p");
+      names.className = "detail-list";
+      names.textContent = ids.map(nameOf).sort((a, b) => a.localeCompare(b)).join(", ");
+      contEl.appendChild(head);
+      contEl.appendChild(names);
+    });
+  }
 
-  $("#detailCount").textContent = activeNames.length + " countries";
+  $("#detailCount").textContent = activeNames.length + (game.subject === "states" ? " states" : " countries");
   $("#resultsDetails").classList.add("hidden");
   $("#detailsBtn").classList.remove("hidden");
 
@@ -1434,6 +1626,7 @@ function startReplayRecording() {
       version: 1,
       savedAt: new Date().toISOString(),
       mode: game.rankMode ? "ranked" : "casual",
+      subject: game.subject || "currency",
       settings: {
         rankMode: game.rankMode,
         examMode: game.examMode,
@@ -1567,7 +1760,11 @@ function runReplay(data) {
   stopTotalTimer();
   $("#countdownOverlay").classList.add("hidden");
 
+  // Swap the map to the recorded subject so rings/labels/hit-testing line up.
+  setSubject(m.subject === "states" ? "states" : "currency");
+
   game = {
+    subject: m.subject === "states" ? "states" : "currency",
     questions: (m.questions || []).map(q => ({ ...q })),
     total: (m.questions || []).length,
     index: 0,
@@ -1786,7 +1983,11 @@ function applyReplayEvent(ev) {
         updateGuessesDisplay();
         $("#currencyBox").classList.toggle("code-only", !game.showFullName);
         $("#currencyName").textContent = game.showFullName ? q.name : q.code;
-        $("#currencySymbol").textContent = q.symbol ? `${q.symbol}   ·   ${q.code}` : q.code;
+        if (game.subject === "states") {
+          $("#currencySymbol").textContent = q.symbol || "";
+        } else {
+          $("#currencySymbol").textContent = q.symbol ? `${q.symbol}   ·   ${q.code}` : q.code;
+        }
         $("#progress").textContent = `${d.index + 1} / ${game.total}`;
         resetCountryClasses();
         if (!preservePulse) clearFlash();
@@ -1922,7 +2123,6 @@ window.addEventListener("error", ev => {
 // forced hard values (5s, interval off, 1 guess, 250 km radius) and the whole
 // menu turns red. Switching OFF restores the user's previous inputs.
 const RANK_BODY_CLASS = "rank-active";
-let rankWasActive = false;   // whether rank mode was active on the previous apply call
 
 // Sizes of the two question pools, used to bound the Rounds input.
 const EXAM_LIST = new Set(EXAM_CURRENCIES);
@@ -1930,98 +2130,24 @@ const EXAM_COUNT = CURRENCIES.filter(c => EXAM_LIST.has(c.code)).length;
 const FULL_COUNT = CURRENCIES.length;
 
 // Bound the Rounds input to the size of the active pool: EXAM_COUNT in 📚
-// mode, FULL_COUNT otherwise. Never lets the user request more than exists.
+// mode, FULL_COUNT (or the number of states) otherwise. Never lets the user
+// request more than exists.
 function syncRoundsMax() {
   const roundsEl = $("#roundsInput");
-  roundsEl.max = $("#examModeInput").checked ? EXAM_COUNT : FULL_COUNT;
+  const max = gameSubject === "states"
+    ? US_STATE_LIST.length
+    : ($("#examModeInput").checked ? EXAM_COUNT : FULL_COUNT);
+  roundsEl.max = max;
   const v = parseInt(roundsEl.value, 10);
   if (Number.isFinite(v) && v > roundsEl.max) roundsEl.value = roundsEl.max;
 }
 
 function applyRankMenuState() {
   const ranked = $("#rankModeInput").checked;
-  const guess = $("#guessTimeInput");
-  const intervalToggle = $("#intervalToggleInput");
-  const intervalTime = $("#intervalTimeInput");
-  const guesses = $("#maxGuessesInput");
-  const radius = $("#snapRadiusInput");
-  const roundsInput = $("#roundsInput");
-  const fullName = $("#showFullNameInput");
-  const countryNames = $("#showCountryNamesInput");
-  const examMode = $("#examModeInput");
-  const nameInput = $("#playerNameInput");
-
-  // Locked in rank mode: difficulty numbers/toggles + display toggles.
-  // 📚 Exam mode stays unlocked so it can be toggled during ranked play.
-  const settingsToLock = [
-    "guessTimeInput",
-    "intervalToggleInput",
-    "intervalTimeInput",
-    "maxGuessesInput",
-    "snapRadiusInput",
-    "roundsInput",
-    "showFullNameInput",
-    "showCountryNamesInput"
-  ];
-
-  if (ranked) {
-    // Store the user's casual values only when actually turning rank ON, so we
-    // can restore them when rank is turned OFF.
-    if (!rankWasActive) {
-      guess.dataset.pref = guess.value;
-      guesses.dataset.pref = guesses.value;
-      radius.dataset.pref = radius.value;
-      intervalToggle.dataset.pref = intervalToggle.checked ? "1" : "0";
-      intervalTime.dataset.pref = intervalTime.value;
-      roundsInput.dataset.pref = roundsInput.value;
-      fullName.dataset.pref = fullName.checked ? "1" : "0";
-      countryNames.dataset.pref = countryNames.checked ? "1" : "0";
-      examMode.dataset.pref = examMode.checked ? "1" : "0";
-    }
-    // Force rank values. 📚 Exam mode is left as-is (togglable).
-    guess.value = 5;
-    guesses.value = 1;
-    radius.value = 250;
-    roundsInput.value = examMode.checked ? EXAM_COUNT : 55; // 55 rounds, or the exam list size if 📚 on
-    intervalToggle.checked = false;
-    intervalTime.disabled = true;
-    intervalTime.value = 0;
-    fullName.checked = false;        // rank hides full currency names
-    countryNames.checked = false;    // rank hides country names (harder)
-    nameInput.placeholder = "Your name… (shown in rank mode)";
-    // Lock every option input so the player can't change them mid-rank.
-    settingsToLock.forEach(id => {
-      const el = document.getElementById(id);
-      el.disabled = true;
-      el.classList.add("locked");
-    });
-  } else {
-    // Restore the user's casual values only when actually turning rank OFF.
-    if (rankWasActive && guess.dataset.pref !== undefined) {
-      guess.value = guess.dataset.pref;
-      guesses.value = guesses.dataset.pref;
-      radius.value = radius.dataset.pref;
-      intervalToggle.checked = intervalToggle.dataset.pref === "1";
-      intervalTime.disabled = false;
-      intervalTime.value = intervalTime.dataset.pref;
-      roundsInput.value = roundsInput.dataset.pref;
-      fullName.checked = fullName.dataset.pref === "1";
-      countryNames.checked = countryNames.dataset.pref === "1";
-      examMode.checked = examMode.dataset.pref === "1";
-    }
-    nameInput.placeholder = "Your name…";
-    // Re-enable every option input.
-    settingsToLock.forEach(id => {
-      const el = document.getElementById(id);
-      el.disabled = false;
-      el.classList.remove("locked");
-    });
-  }
-
-  rankWasActive = ranked;
+  // Rank mode only changes how many rounds you play — it never locks or forces
+  // the difficulty settings, so all inputs stay exactly as the user set them.
+  // It just recolors the app to the ranked theme.
   document.body.classList.toggle(RANK_BODY_CLASS, ranked);
-  syncRoundsMax();
-  syncIntervalState();
 }
 
 // ================= Settings overlay (categorized) =================
@@ -2090,12 +2216,15 @@ function saveSettings() {
       showCountryNames: $("#showCountryNamesInput").checked,
       tapSelect: $("#tapSelectInput").checked,
       pulse: $("#pulseToggleInput").checked,
+      bgEffects: $("#bgEffectsInput").checked,
+      bgRate: $("#bgRateInput").value,
       themeNormal: $("#themeNormalInput").value,
       themeRank: $("#themeRankInput").value,
       sound: $("#soundInput").checked,
       examMode: $("#examModeInput").checked,
       playerName: $("#playerNameInput").value,
-      countries: [...selectedCountries]
+      countries: [...selectedCountries],
+      states: [...selectedStates]
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
   } catch (e) { /* storage unavailable — ignore */ }
@@ -2116,6 +2245,8 @@ function loadSettings() {
     if (d.showCountryNames !== undefined) $("#showCountryNamesInput").checked = !!d.showCountryNames;
     if (d.tapSelect !== undefined) $("#tapSelectInput").checked = !!d.tapSelect;
     if (d.pulse !== undefined) $("#pulseToggleInput").checked = !!d.pulse;
+    if (d.bgEffects !== undefined) $("#bgEffectsInput").checked = !!d.bgEffects;
+    if (d.bgRate !== undefined) $("#bgRateInput").value = d.bgRate;
     if (d.themeNormal !== undefined) $("#themeNormalInput").value = d.themeNormal;
     if (d.themeRank !== undefined) $("#themeRankInput").value = d.themeRank;
     if (d.sound !== undefined) $("#soundInput").checked = !!d.sound;
@@ -2125,6 +2256,10 @@ function loadSettings() {
       selectedCountries.clear();
       d.countries.forEach(id => selectedCountries.add(Number(id)));
     }
+    if (Array.isArray(d.states)) {
+      selectedStates.clear();
+      d.states.forEach(id => selectedStates.add(String(id)));
+    }
   } catch (e) { /* corrupt save — ignore */ }
 }
 
@@ -2133,6 +2268,14 @@ function loadSettings() {
 function initSelectedCountries() {
   if (selectedCountries.size === 0 && countryList.length) {
     countryList.forEach(c => selectedCountries.add(c.id));
+  }
+}
+
+// ================= State toggle =================
+// Default: every U.S. state selected.
+function initSelectedStates() {
+  if (selectedStates.size === 0 && US_STATE_LIST.length) {
+    US_STATE_LIST.forEach(s => selectedStates.add(s.code));
   }
 }
 
@@ -2252,6 +2395,56 @@ function setAllCountries(on) {
   updateContinentCounts();
 }
 
+// ================= State List (Question Lists settings) =================
+// Render every U.S. state as an individual toggle, respecting the search box.
+function renderStateList() {
+  const container = $("#stateList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const q = ($("#stateSearch") || {}).value?.trim().toLowerCase() || "";
+
+  US_STATE_LIST.forEach(s => {
+    if (q && !s.name.toLowerCase().includes(q) && !s.abbr.toLowerCase().includes(q)) return;
+    const label = document.createElement("label");
+    label.className = "country-toggle state-toggle";
+    label.dataset.name = s.name.toLowerCase();
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = selectedStates.has(s.code);
+    cb.dataset.id = s.code;
+    cb.addEventListener("change", () => {
+      if (cb.checked) selectedStates.add(s.code);
+      else selectedStates.delete(s.code);
+      saveSettings();
+      updateStateCount();
+    });
+    const span = document.createElement("span");
+    span.textContent = s.name;
+    label.appendChild(cb);
+    label.appendChild(span);
+    container.appendChild(label);
+  });
+
+  updateStateCount();
+}
+
+// Show a small "X / N selected" summary for the State List.
+function updateStateCount() {
+  const el = $("#stateCount");
+  if (!el) return;
+  const sel = US_STATE_LIST.filter(s => selectedStates.has(s.code)).length;
+  el.textContent = sel + " / " + US_STATE_LIST.length + " states";
+}
+
+function setAllStates(on) {
+  selectedStates.clear();
+  if (on) US_STATE_LIST.forEach(s => selectedStates.add(s.code));
+  document.querySelectorAll("#stateList input").forEach(cb => { cb.checked = on; });
+  saveSettings();
+  updateStateCount();
+}
+
 // Country ids covered by 📚 Exam mode (the countries used by EXAM_CURRENCIES).
 let savedCountriesBeforeExam = null;
 
@@ -2305,19 +2498,25 @@ function closeOverlay(id) {
   setTimeout(() => ov.classList.add("hidden"), 220);
 }
 
-// Rank mode picker: choose how many rounds the ranked game plays.
-// "all" = every available currency (respects Exam mode), otherwise a fixed count.
-let pendingRankRounds = 50;        // default rank mode
+// Rank mode is driven by the RANKED switch in the menu. When on, the play
+// buttons run a hardcore game: 1 guess, no interval wait, 5s per round.
+// Currency shows a picker to choose 50/70/100/all rounds; states always plays
+// every state.
 
+// Ranked rounds for the current subject. "all" = every available question.
+let pendingRankRounds = "all";
+
+// Open the rank-size picker (currency only — states always plays every state).
 function openRankPicker() {
-  // With Exam mode on, there's no rank-size choice: play the full exam list
-  // (EXAM_COUNT rounds) directly, without showing the picker.
+  // With Exam mode on (currency only), there's no rank-size choice: play the
+  // full exam list (EXAM_COUNT rounds) directly, without showing the picker.
   if ($("#examModeInput").checked) {
     startRankMode("all");
     return;
   }
-  const poolTotal = FULL_COUNT;
-  $("#rankAllCount").textContent = poolTotal;
+  // Currency pool size: all available currencies.
+  $("#rankAllCount").textContent = FULL_COUNT;
+  $("#rankAllSub").textContent = "every available currency";
   openOverlay("rankPicker");
 }
 
@@ -2344,6 +2543,8 @@ const SETTING_DEFAULTS = {
   tapSelectInput: true,
   pulseToggleInput: true,
   soundInput: true,
+  bgEffectsInput: true,
+  bgRateInput: "100",
   examModeInput: false,
   themeNormalInput: "#4cc9f0",
   themeRankInput: "#ef4444",
@@ -2357,6 +2558,8 @@ function afterSettingChange(id) {
   if (id === "roundsInput") syncRoundsMax();
   if (id === "themeNormalInput" || id === "themeRankInput") applyTheme();
   if (id === "pulseToggleInput") setPulse($("#pulseToggleInput").checked);
+  if (id === "bgEffectsInput") syncBgEffectsState();
+  if (id === "bgRateInput") applyBgRate();
   saveSettings();
 }
 
@@ -2405,10 +2608,14 @@ function resetDefaults() {
   $("#pulseToggleInput").checked = true;
   $("#themeNormalInput").value = "#4cc9f0";
   $("#themeRankInput").value = "#ef4444";
+  $("#bgEffectsInput").checked = true;
+  $("#bgRateInput").value = "100";
   setAllCountries(true);   // reset country toggles to all-on
+  setAllStates(true);      // reset state toggles to all-on
   syncRoundsMax();
   syncIntervalState();
   applyTheme();
+  applyBgRate();
   setPulse(true);
   saveSettings();
 }
@@ -2437,6 +2644,8 @@ function goToMenu() {
   }
   $("#rankModeInput").checked = false;
   applyRankMenuState();
+  // Return the map to the currency subject so the menu/map shows the world.
+  setSubject("currency");
   showScreen("menu");
 }
 
@@ -2507,7 +2716,9 @@ function makeBgSymbols() {
     s.textContent = MENU_SYMBOLS[i % MENU_SYMBOLS.length];
     s.style.left = (Math.random() * 100) + "%";
     s.style.fontSize = (18 + Math.random() * 42) + "px";
-    s.style.animationDuration = (14 + Math.random() * 18) + "s";
+    const baseDur = 14 + Math.random() * 18;
+    s.dataset.baseDur = baseDur;
+    s.style.animationDuration = baseDur + "s";
     s.style.animationDelay = (Math.random() * -24) + "s"; // negative -> already mid-drift
     wrap.appendChild(s);
   }
@@ -2522,6 +2733,7 @@ function setupParticleCanvas() {
   let W = 0, H = 0;
   const P = [];
   let raf = null;
+  let rate = 100;                   // current background effect rate (%)
 
   const resize = () => {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -2532,7 +2744,8 @@ function setupParticleCanvas() {
     canvas.style.width = W + "px";
     canvas.style.height = H + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const target = Math.min(90, Math.round((W * H) / 18000));
+    // Scale particle count with the effect rate too.
+    const target = Math.round((W * H) / 18000 * Math.min(1.6, Math.max(0.3, rate / 100)));
     while (P.length < target) P.push(makeP());
     P.length = target;
   };
@@ -2546,13 +2759,15 @@ function setupParticleCanvas() {
   });
 
   const step = () => {
+    if (rate <= 0) { raf = requestAnimationFrame(step); return; }
     ctx.clearRect(0, 0, W, H);
+    const speed = rate / 100;         // velocity multiplier
     const rootStyle = getComputedStyle(document.documentElement);
     const c = (document.body.classList.contains("rank-active")
       ? rootStyle.getPropertyValue("--rank-light-rgb")
       : rootStyle.getPropertyValue("--acc-rgb")).trim() || "76, 201, 240";
     for (const p of P) {
-      p.x += p.vx; p.y += p.vy;
+      p.x += p.vx * speed; p.y += p.vy * speed;
       if (p.x < -10) p.x = W + 10; else if (p.x > W + 10) p.x = -10;
       if (p.y < -10) p.y = H + 10; else if (p.y > H + 10) p.y = -10;
       ctx.beginPath();
@@ -2561,12 +2776,13 @@ function setupParticleCanvas() {
       ctx.fill();
     }
     ctx.lineWidth = 0.6;
+    const linkDist = 120 * Math.min(1.5, Math.max(0.5, speed));  // density scales with rate
     for (let i = 0; i < P.length; i++) {
       for (let j = i + 1; j < P.length; j++) {
         const dx = P[i].x - P[j].x, dy = P[i].y - P[j].y;
         const d2 = dx * dx + dy * dy;
-        if (d2 < 14400) { // 120px²
-          const a = 1 - Math.sqrt(d2) / 120;
+        if (d2 < linkDist * linkDist) {
+          const a = 1 - Math.sqrt(d2) / linkDist;
           ctx.strokeStyle = "rgba(" + c + "," + (a * 0.35) + ")";
           ctx.beginPath();
           ctx.moveTo(P[i].x, P[i].y);
@@ -2579,7 +2795,7 @@ function setupParticleCanvas() {
   };
 
   menuParticles = REDUCED_MOTION ? {
-    start() {}, stop() {}
+    start() {}, stop() {}, setRate(r) { rate = r; }
   } : {
     start() {
       if (raf !== null || !canvas) return;
@@ -2588,6 +2804,16 @@ function setupParticleCanvas() {
     },
     stop() {
       if (raf !== null) { cancelAnimationFrame(raf); raf = null; }
+    },
+    setRate(r) {
+      rate = r;
+      if (rate <= 0) {
+        ctx.clearRect(0, 0, W, H);
+        canvas.style.display = "none";
+      } else {
+        canvas.style.display = "";
+        if (raf === null && menuBgActive) { resize(); raf = requestAnimationFrame(step); }
+      }
     }
   };
 
@@ -2612,6 +2838,59 @@ function initMenuBackground() {
     if (document.hidden) menuParticles && menuParticles.stop();
     else if (menuBgActive) menuParticles && menuParticles.start();
   });
+}
+
+// Background effects enabled + rate (%). When disabled, everything is off.
+let bgEffectsEnabled = true;
+let bgEffectRate = 100;
+
+// The Background Effects toggle disables/greys the rate input (like Interval
+// Wait does for Interval Time).
+function syncBgEffectsState() {
+  const on = $("#bgEffectsInput") && $("#bgEffectsInput").checked;
+  bgEffectsEnabled = !!on;
+  const rateEl = $("#bgRateInput");
+  if (rateEl) {
+    rateEl.disabled = !on;
+    rateEl.classList.toggle("locked", !on);
+  }
+  applyBgRate();
+}
+
+// Apply the rate to every animated background layer: floating symbols,
+// particle network, and gradient blobs. When effects are disabled (or rate is
+// 0), everything is turned off.
+function applyBgRate() {
+  const el = $("#bgRateInput");
+  let rate = el ? parseFloat(el.value) : 100;
+  if (!isFinite(rate) || rate < 0) rate = 100;
+  if (!bgEffectsEnabled) rate = 0;
+  bgEffectRate = rate;
+
+  const off = rate <= 0;
+  const mul = off ? 1 : 100 / rate;   // >1 = slower, <1 = faster
+
+  // Floating symbols: scale drift speed (longer duration = slower).
+  document.querySelectorAll("#bgSymbols .sym").forEach(s => {
+    const base = parseFloat(s.dataset.baseDur) || 16;
+    s.style.animationDuration = (base * mul) + "s";
+    s.style.animationPlayState = off ? "paused" : "running";
+  });
+  // When off, hide the symbols layer entirely (also stops layout cost).
+  const symWrap = $("#bgSymbols");
+  if (symWrap) symWrap.style.display = off ? "none" : "";
+
+  // Gradient blobs: scale float duration; freeze or hide when off.
+  document.querySelectorAll(".blob").forEach((b, i) => {
+    const base = [18, 22, 26][i % 3];
+    b.style.animationDuration = (base * mul) + "s";
+    b.style.animationPlayState = off ? "paused" : "running";
+  });
+
+  // Particle network: pass the rate to the canvas loop (velocity + draw).
+  if (menuParticles && typeof menuParticles.setRate === "function") {
+    menuParticles.setRate(rate);
+  }
 }
 
 // ================= Theme (color customization) =================
@@ -2704,14 +2983,16 @@ document.addEventListener("DOMContentLoaded", () => {
   // render the country toggles and apply menu state.
   loadSettings();
   initSelectedCountries();
+  initSelectedStates();
   renderCountryList();
+  renderStateList();
   addPerSettingReset();
   applyTheme();                    // apply chosen Normal/Rank colors
+  syncBgEffectsState();            // apply the saved background effects toggle + rate
   setPulse($("#pulseToggleInput").checked);
   applyRankMenuState();
   syncRoundsMax();
   syncIntervalState();
-  $("#rankModeInput").addEventListener("change", applyRankMenuState);
 
   // Save any changed casual setting as soon as it changes (on both change and
   // input, so nothing is lost even if the settings panel is closed abruptly).
@@ -2719,7 +3000,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "guessTimeInput", "intervalToggleInput", "intervalTimeInput",
     "maxGuessesInput", "snapRadiusInput", "roundsInput",
     "showFullNameInput", "showCountryNamesInput", "tapSelectInput", "soundInput",
-    "examModeInput", "playerNameInput", "pulseToggleInput",
+    "bgEffectsInput", "bgRateInput", "examModeInput", "playerNameInput", "pulseToggleInput",
     "themeNormalInput", "themeRankInput"
   ].forEach(id => {
     const el = $(id);
@@ -2731,6 +3012,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Re-apply the theme live as the color pickers change.
   $("#themeNormalInput").addEventListener("input", applyTheme);
   $("#themeRankInput").addEventListener("input", applyTheme);
+  // Background effect rate applied live; the enable toggle greys it out.
+  $("#bgRateInput").addEventListener("input", applyBgRate);
+  $("#bgEffectsInput").addEventListener("change", syncBgEffectsState);
   // Pulse toggle applied live.
   $("#pulseToggleInput").addEventListener("change", () => setPulse($("#pulseToggleInput").checked));
 
@@ -2753,6 +3037,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   $("#countryAllBtn").addEventListener("click", () => setAllCountries(true));
   $("#countryNoneBtn").addEventListener("click", () => setAllCountries(false));
+
+  // State List controls (Question Lists settings).
+  $("#stateSearch").addEventListener("input", renderStateList);
+  $("#stateAllBtn").addEventListener("click", () => setAllStates(true));
+  $("#stateNoneBtn").addEventListener("click", () => setAllStates(false));
   // Clicking a continent heading toggles every country in it. Clicking the
   // heading's own checkbox is handled by its change event, so ignore it here
   // to avoid toggling twice.
@@ -2767,15 +3056,32 @@ document.addEventListener("DOMContentLoaded", () => {
   syncCountriesState();
   $("#examModeInput").addEventListener("change", syncCountriesState);
 
-  // Mode buttons: PLAY = casual, RANKED = rank mode.
-  $("#playBtn").addEventListener("click", () => {
-    $("#rankModeInput").checked = false;
-    applyRankMenuState();
-    startGame();
+  // Mode buttons: CURRENCY / U.S. STATES. The RANKED switch controls rank
+  // mode. When on, CURRENCY opens the rank-size picker (50/70/100/all);
+  // U.S. STATES goes straight to the map and plays every state.
+  $("#currencyBtn").addEventListener("click", () => {
+    setSubject("currency");
+    if ($("#rankModeInput").checked) {
+      openRankPicker();
+    } else {
+      startGame();
+    }
   });
-  $("#rankedBtn").addEventListener("click", openRankPicker);
+  $("#statesBtn").addEventListener("click", () => {
+    setSubject("states");
+    if ($("#rankModeInput").checked) {
+      pendingRankRounds = "all";
+      startGame();
+    } else {
+      startGame();
+    }
+  });
+  // The RANKED switch: toggling it re-syncs the locked settings via
+  // applyRankMenuState() (which also recolors the play buttons via the
+  // body.rank-active class).
+  $("#rankModeInput").addEventListener("change", applyRankMenuState);
 
-  // Rank picker controls.
+  // Rank picker controls (currency ranked rounds).
   document.querySelectorAll(".rank-opt").forEach(btn => {
     btn.addEventListener("click", () => startRankMode(btn.dataset.rounds));
   });
