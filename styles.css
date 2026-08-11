@@ -1215,6 +1215,26 @@ body.rank-active .credit { color: var(--rank-faint); }
 }
 .mode-row .mode-btn { flex: 1; }
 
+/* Full-name toggles shown directly under the play buttons. */
+.mode-name-toggles {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 4px 8px 0;
+}
+.mode-name-toggles .setting.toggle { gap: 8px; font-size: 14px; }
+.mode-name-toggles .toggle input[type="checkbox"] {
+  width: 40px;
+  height: 22px;
+}
+.mode-name-toggles .toggle input[type="checkbox"]::after {
+  width: 16px;
+  height: 16px;
+}
+.mode-name-toggles .toggle input[type="checkbox"]:checked::after {
+  transform: translateX(18px);
+}
+
 .mode-btn {
   width: 100%;
   padding: 18px 24px;

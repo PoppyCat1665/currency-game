@@ -33,6 +33,16 @@
           <button id="currencyBtn" class="btn primary mode-btn">🌍 &nbsp;CURRENCY</button>
           <button id="statesBtn" class="btn primary mode-btn">🇺🇸 &nbsp;U.S. STATES</button>
         </div>
+        <div class="mode-name-toggles">
+          <label class="setting toggle">
+            <span>Full Country Name</span>
+            <input id="showFullCountryNameInput" type="checkbox" checked>
+          </label>
+          <label class="setting toggle">
+            <span>Full State Name</span>
+            <input id="showFullStateNameInput" type="checkbox" checked>
+          </label>
+        </div>
       </div>
       <p class="mode-subtitle">Guess countries by currency — or identify U.S. states on a map. Toggle RANKED for a hardcore run.</p>
 
@@ -42,7 +52,7 @@
 
       <p class="hint">Pick a subject, then click the correct country or state before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v4.1</p>
+      <p class="version" id="appVersion">v4.2</p>
     </div>
   </div>
 
@@ -171,11 +181,6 @@
                 </div>
               </div>
               <div id="countryList" class="country-list"></div>
-              <label class="setting toggle">
-                <span>Show Full Country Name</span>
-                <span class="info-icon" data-info="Ranked: fixed OFF (shows code only)">ⓘ</span>
-                <input id="showFullCountryNameInput" type="checkbox" checked>
-              </label>
               <p class="setting-note">Currency Mode only asks about the enabled countries. Disabled countries never appear. Ignored in Ranked and Exam mode.</p>
               <p class="setting-note hidden" id="countriesDisabledNote">Disabled while 📚 Exam Mode is on.</p>
             </div>
@@ -189,11 +194,6 @@
                 </div>
               </div>
               <div id="stateList" class="country-list"></div>
-              <label class="setting toggle">
-                <span>Show Full State Name</span>
-                <span class="info-icon" data-info="Ranked: fixed OFF (shows abbreviation only)">ⓘ</span>
-                <input id="showFullStateNameInput" type="checkbox" checked>
-              </label>
               <p class="setting-note"><span id="stateCount"></span> — U.S. States Mode only asks about the enabled states.</p>
             </div>
           </section>
