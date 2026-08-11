@@ -1064,12 +1064,15 @@ function startGame() {
   let questions;
 
   if (gameSubject === "states") {
-    // U.S. States mode: each enabled state is a question. The answer target
-    // is the state's own FIPS id (single state per question). The currency
-    // box shows the state's name / abbreviation.
-    const activeStates = selectedStates.size > 0
-      ? US_STATE_LIST.filter(s => selectedStates.has(s.code))
-      : US_STATE_LIST;
+    // U.S. States mode: each state is a question. The answer target is the
+    // state's own FIPS id (single state per question). Ranked mode always
+    // plays every state (the State List is ignored). Casual uses the enabled
+    // State List.
+    const activeStates = rankMode
+      ? US_STATE_LIST
+      : (selectedStates.size > 0
+        ? US_STATE_LIST.filter(s => selectedStates.has(s.code))
+        : US_STATE_LIST);
     if (activeStates.length === 0) {
       showToast("⚠ No states selected — enable at least one state in Settings → Question Lists → State List", false);
       return;
