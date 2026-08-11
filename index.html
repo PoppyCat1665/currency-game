@@ -42,7 +42,7 @@
 
       <p class="hint">Pick a subject, then click the correct country or state before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v4.0</p>
+      <p class="version" id="appVersion">v4.1</p>
     </div>
   </div>
 
@@ -103,11 +103,6 @@
 
           <section class="cat-section" data-section="display">
             <h3>Display</h3>
-            <label class="setting toggle">
-              <span>Show Full Currency Name</span>
-              <span class="info-icon" data-info="Ranked: fixed OFF (shows code only)">ⓘ</span>
-              <input id="showFullNameInput" type="checkbox" checked>
-            </label>
             <label class="setting toggle">
               <span>Show Country Names on Map</span>
               <span class="info-icon" data-info="Ranked: fixed OFF">ⓘ</span>
@@ -176,6 +171,11 @@
                 </div>
               </div>
               <div id="countryList" class="country-list"></div>
+              <label class="setting toggle">
+                <span>Show Full Country Name</span>
+                <span class="info-icon" data-info="Ranked: fixed OFF (shows code only)">ⓘ</span>
+                <input id="showFullCountryNameInput" type="checkbox" checked>
+              </label>
               <p class="setting-note">Currency Mode only asks about the enabled countries. Disabled countries never appear. Ignored in Ranked and Exam mode.</p>
               <p class="setting-note hidden" id="countriesDisabledNote">Disabled while 📚 Exam Mode is on.</p>
             </div>
@@ -189,6 +189,11 @@
                 </div>
               </div>
               <div id="stateList" class="country-list"></div>
+              <label class="setting toggle">
+                <span>Show Full State Name</span>
+                <span class="info-icon" data-info="Ranked: fixed OFF (shows abbreviation only)">ⓘ</span>
+                <input id="showFullStateNameInput" type="checkbox" checked>
+              </label>
               <p class="setting-note"><span id="stateCount"></span> — U.S. States Mode only asks about the enabled states.</p>
             </div>
           </section>

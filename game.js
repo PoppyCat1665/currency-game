@@ -1041,8 +1041,13 @@ function startGame() {
   const maxGuesses = Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
   const snapRadiusKm = Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
 
-  // Read display & sound preferences for this session
-  const showFullName = $("#showFullNameInput").checked;
+  // Read display & sound preferences for this session. The "show full name"
+  // toggle is per-subject (country vs state) and is always forced off in rank.
+  const showFullName = rankMode
+    ? false
+    : (gameSubject === "states"
+      ? $("#showFullStateNameInput").checked
+      : $("#showFullCountryNameInput").checked);
   const showCountryNames = $("#showCountryNamesInput").checked;
   const tapSelect = $("#tapSelectInput").checked;
   soundsEnabled = $("#soundInput").checked;
@@ -2151,6 +2156,15 @@ function applyRankMenuState() {
   // the difficulty settings, so all inputs stay exactly as the user set them.
   // It just recolors the app to the ranked theme.
   document.body.classList.toggle(RANK_BODY_CLASS, ranked);
+
+  // The full-name toggles are always off during ranked (and greyed out).
+  ["showFullCountryNameInput", "showFullStateNameInput"].forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.disabled = ranked;
+    el.classList.toggle("locked", ranked);
+    if (ranked) el.checked = false;
+  });
 }
 
 // ================= Settings overlay (categorized) =================
@@ -2215,7 +2229,8 @@ function saveSettings() {
       maxGuesses: $("#maxGuessesInput").value,
       snapRadius: $("#snapRadiusInput").value,
       rounds: $("#roundsInput").value,
-      showFullName: $("#showFullNameInput").checked,
+      showFullCountryName: $("#showFullCountryNameInput").checked,
+      showFullStateName: $("#showFullStateNameInput").checked,
       showCountryNames: $("#showCountryNamesInput").checked,
       tapSelect: $("#tapSelectInput").checked,
       pulse: $("#pulseToggleInput").checked,
@@ -2244,7 +2259,8 @@ function loadSettings() {
     if (d.maxGuesses !== undefined) $("#maxGuessesInput").value = d.maxGuesses;
     if (d.snapRadius !== undefined) $("#snapRadiusInput").value = d.snapRadius;
     if (d.rounds !== undefined) $("#roundsInput").value = d.rounds;
-    if (d.showFullName !== undefined) $("#showFullNameInput").checked = !!d.showFullName;
+    if (d.showFullCountryName !== undefined) $("#showFullCountryNameInput").checked = !!d.showFullCountryName;
+    if (d.showFullStateName !== undefined) $("#showFullStateNameInput").checked = !!d.showFullStateName;
     if (d.showCountryNames !== undefined) $("#showCountryNamesInput").checked = !!d.showCountryNames;
     if (d.tapSelect !== undefined) $("#tapSelectInput").checked = !!d.tapSelect;
     if (d.pulse !== undefined) $("#pulseToggleInput").checked = !!d.pulse;
@@ -2541,7 +2557,8 @@ const SETTING_DEFAULTS = {
   maxGuessesInput: "1",
   snapRadiusInput: "1000",
   roundsInput: "40",
-  showFullNameInput: true,
+  showFullCountryNameInput: true,
+  showFullStateNameInput: true,
   showCountryNamesInput: true,
   tapSelectInput: true,
   pulseToggleInput: true,
@@ -2603,7 +2620,8 @@ function resetDefaults() {
   $("#maxGuessesInput").value = 1;
   $("#snapRadiusInput").value = 1000;
   $("#roundsInput").value = 40;
-  $("#showFullNameInput").checked = true;
+  $("#showFullCountryNameInput").checked = true;
+  $("#showFullStateNameInput").checked = true;
   $("#showCountryNamesInput").checked = true;
   $("#soundInput").checked = true;
   $("#examModeInput").checked = false;
@@ -3002,7 +3020,7 @@ document.addEventListener("DOMContentLoaded", () => {
   [
     "guessTimeInput", "intervalToggleInput", "intervalTimeInput",
     "maxGuessesInput", "snapRadiusInput", "roundsInput",
-    "showFullNameInput", "showCountryNamesInput", "tapSelectInput", "soundInput",
+    "showFullCountryNameInput", "showFullStateNameInput", "showCountryNamesInput", "tapSelectInput", "soundInput",
     "bgEffectsInput", "bgRateInput", "examModeInput", "playerNameInput", "pulseToggleInput",
     "themeNormalInput", "themeRankInput"
   ].forEach(id => {
