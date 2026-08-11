@@ -297,13 +297,15 @@ input[type="number"] {
 }
 
 /* ---------- Currency display ---------- */
+/* The name/symbol keep the SAME font size whether showing the code or the full
+   name, so the box height never changes and the map doesn't shift. */
 .currency-box.code-only .currency-name {
-  font-size: 36px;
-  letter-spacing: 2px;
+  font-size: 24px;
+  letter-spacing: 1px;
 }
 
 .currency-box.code-only .currency-symbol {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 /* ---------- Buttons ---------- */
