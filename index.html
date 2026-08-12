@@ -52,7 +52,7 @@
 
       <p class="hint">Pick a subject, then click the correct country or state before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v4.3</p>
+      <p class="version" id="appVersion">v4.4</p>
     </div>
   </div>
 
@@ -139,12 +139,18 @@
           <section class="cat-section" data-section="map">
             <h3>Map</h3>
             <label class="setting">
-              <span>Click Radius</span>
-              <span class="info-icon" data-info="Ranked: fixed at 250km">ⓘ</span>
-              <input id="snapRadiusInput" type="number" min="0" max="1000" step="10" value="1000">
+              <span>Currency Click Radius</span>
+              <span class="info-icon" data-info="How forgiving tapping near a country is">ⓘ</span>
+              <input id="snapRadiusCurrencyInput" type="number" min="0" max="1000" step="10" value="1000">
               <span class="unit">km</span>
             </label>
-            <p class="setting-note">Larger values make country selection more forgiving when tapping near a country.</p>
+            <label class="setting">
+              <span>State Click Radius</span>
+              <span class="info-icon" data-info="How forgiving tapping near a state is">ⓘ</span>
+              <input id="snapRadiusStateInput" type="number" min="0" max="1000" step="10" value="100">
+              <span class="unit">km</span>
+            </label>
+            <p class="setting-note">Larger values make country/state selection more forgiving when tapping near the target.</p>
             <label class="setting toggle">
               <span>Pen / Touch Tap Select</span>
               <input id="tapSelectInput" type="checkbox" checked>

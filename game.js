@@ -1039,7 +1039,11 @@ function startGame() {
     ? Math.max(0, parseInt($("#intervalTimeInput").value, 10) || 3)
     : 0; // interval off -> skip straight to the next round
   const maxGuesses = Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
-  const snapRadiusKm = Math.max(0, parseFloat($("#snapRadiusInput").value) || 1000);
+  // Click radius is per-subject: currency uses its own setting, states uses the
+  // state setting (default 100).
+  const snapRadiusKm = gameSubject === "states"
+    ? Math.max(0, parseFloat($("#snapRadiusStateInput").value) || 100)
+    : Math.max(0, parseFloat($("#snapRadiusCurrencyInput").value) || 1000);
 
   // Read display & sound preferences for this session. The "show full name"
   // toggle is per-subject (country vs state) and is always forced off in rank.
@@ -2227,7 +2231,8 @@ function saveSettings() {
       intervalToggle: $("#intervalToggleInput").checked,
       intervalTime: $("#intervalTimeInput").value,
       maxGuesses: $("#maxGuessesInput").value,
-      snapRadius: $("#snapRadiusInput").value,
+      snapRadiusCurrency: $("#snapRadiusCurrencyInput").value,
+      snapRadiusState: $("#snapRadiusStateInput").value,
       rounds: $("#roundsInput").value,
       showFullCountryName: $("#showFullCountryNameInput").checked,
       showFullStateName: $("#showFullStateNameInput").checked,
@@ -2257,7 +2262,8 @@ function loadSettings() {
     if (d.intervalToggle !== undefined) $("#intervalToggleInput").checked = !!d.intervalToggle;
     if (d.intervalTime !== undefined) $("#intervalTimeInput").value = d.intervalTime;
     if (d.maxGuesses !== undefined) $("#maxGuessesInput").value = d.maxGuesses;
-    if (d.snapRadius !== undefined) $("#snapRadiusInput").value = d.snapRadius;
+    if (d.snapRadiusCurrency !== undefined) $("#snapRadiusCurrencyInput").value = d.snapRadiusCurrency;
+    if (d.snapRadiusState !== undefined) $("#snapRadiusStateInput").value = d.snapRadiusState;
     if (d.rounds !== undefined) $("#roundsInput").value = d.rounds;
     if (d.showFullCountryName !== undefined) $("#showFullCountryNameInput").checked = !!d.showFullCountryName;
     if (d.showFullStateName !== undefined) $("#showFullStateNameInput").checked = !!d.showFullStateName;
@@ -2554,7 +2560,8 @@ const SETTING_DEFAULTS = {
   intervalToggleInput: true,
   intervalTimeInput: "3",
   maxGuessesInput: "1",
-  snapRadiusInput: "1000",
+  snapRadiusCurrencyInput: "1000",
+  snapRadiusStateInput: "100",
   roundsInput: "40",
   showFullCountryNameInput: true,
   showFullStateNameInput: true,
@@ -2617,7 +2624,8 @@ function resetDefaults() {
   $("#intervalToggleInput").checked = true;
   $("#intervalTimeInput").value = 3;
   $("#maxGuessesInput").value = 1;
-  $("#snapRadiusInput").value = 1000;
+  $("#snapRadiusCurrencyInput").value = 1000;
+  $("#snapRadiusStateInput").value = 100;
   $("#roundsInput").value = 40;
   $("#showFullCountryNameInput").checked = true;
   $("#showFullStateNameInput").checked = true;
@@ -3018,7 +3026,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // input, so nothing is lost even if the settings panel is closed abruptly).
   [
     "guessTimeInput", "intervalToggleInput", "intervalTimeInput",
-    "maxGuessesInput", "snapRadiusInput", "roundsInput",
+    "maxGuessesInput", "snapRadiusCurrencyInput", "snapRadiusStateInput", "roundsInput",
     "showFullCountryNameInput", "showFullStateNameInput", "showCountryNamesInput", "tapSelectInput", "soundInput",
     "bgEffectsInput", "bgRateInput", "examModeInput", "playerNameInput", "pulseToggleInput",
     "themeNormalInput", "themeRankInput"
