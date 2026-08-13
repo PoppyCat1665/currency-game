@@ -1498,6 +1498,28 @@ body.rank-active .credit { color: var(--rank-faint); }
 .question-list-block .country-list { max-height: 220px; }
 .question-list-block .country-toggle { font-size: 12px; }
 
+/* State List: two side-by-side parts (Left / Right). */
+#stateList {
+  display: flex;
+  gap: 12px;
+}
+.state-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.state-col-head {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.state-col .country-toggle { width: 100%; }
+
 .setting select.setting-select,
 .setting-select {
   background: #0d1530;

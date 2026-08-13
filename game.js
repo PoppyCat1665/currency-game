@@ -1114,12 +1114,16 @@ function startGame() {
 
   questions = shuffle(questions);
   // Rounds: ranked plays a chosen count for currency (50/70/100/all) and every
-  // state for states mode. Casual uses the Rounds setting.
+  // state for states mode. Casual states mode always plays EXACTLY the number
+  // of enabled states (the Rounds setting is ignored). Other casual uses the
+  // Rounds setting.
   let roundsRequested;
   if (rankMode) {
     roundsRequested = (gameSubject === "states" || pendingRankRounds === "all")
       ? questions.length
       : parseInt(pendingRankRounds, 10) || questions.length;
+  } else if (gameSubject === "states") {
+    roundsRequested = questions.length;
   } else {
     roundsRequested = Math.max(1, parseInt($("#roundsInput").value, 10) || 40);
   }
@@ -2421,35 +2425,55 @@ function setAllCountries(on) {
 }
 
 // ================= State List (Question Lists settings) =================
-// Render every U.S. state as an individual toggle, respecting the search box.
+// Build one state toggle row.
+function makeStateRow(s) {
+  const label = document.createElement("label");
+  label.className = "country-toggle state-toggle";
+  label.dataset.name = s.name.toLowerCase();
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = selectedStates.has(s.code);
+  cb.dataset.id = s.code;
+  cb.addEventListener("change", () => {
+    if (cb.checked) selectedStates.add(s.code);
+    else selectedStates.delete(s.code);
+    saveSettings();
+    updateStateCount();
+  });
+  const span = document.createElement("span");
+  span.textContent = s.name;
+  label.appendChild(cb);
+  label.appendChild(span);
+  return label;
+}
+
+// Render every U.S. state as an individual toggle, respecting the search box,
+// split into two side-by-side parts (Left / Right columns).
 function renderStateList() {
   const container = $("#stateList");
   if (!container) return;
   container.innerHTML = "";
 
   const q = ($("#stateSearch") || {}).value?.trim().toLowerCase() || "";
+  const visible = US_STATE_LIST.filter(s =>
+    !q || s.name.toLowerCase().includes(q) || s.abbr.toLowerCase().includes(q));
 
-  US_STATE_LIST.forEach(s => {
-    if (q && !s.name.toLowerCase().includes(q) && !s.abbr.toLowerCase().includes(q)) return;
-    const label = document.createElement("label");
-    label.className = "country-toggle state-toggle";
-    label.dataset.name = s.name.toLowerCase();
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = selectedStates.has(s.code);
-    cb.dataset.id = s.code;
-    cb.addEventListener("change", () => {
-      if (cb.checked) selectedStates.add(s.code);
-      else selectedStates.delete(s.code);
-      saveSettings();
-      updateStateCount();
-    });
-    const span = document.createElement("span");
-    span.textContent = s.name;
-    label.appendChild(cb);
-    label.appendChild(span);
-    container.appendChild(label);
-  });
+  // Divide the filtered states into two halves: Left and Right.
+  const half = Math.ceil(visible.length / 2);
+
+  const buildCol = (items, label) => {
+    const wrap = document.createElement("div");
+    wrap.className = "state-col";
+    const head = document.createElement("div");
+    head.className = "state-col-head";
+    head.textContent = label;
+    wrap.appendChild(head);
+    items.forEach(s => wrap.appendChild(makeStateRow(s)));
+    return wrap;
+  };
+
+  container.appendChild(buildCol(visible.slice(0, half), "Left"));
+  container.appendChild(buildCol(visible.slice(half), "Right"));
 
   updateStateCount();
 }
