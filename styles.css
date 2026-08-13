@@ -1511,12 +1511,28 @@ body.rank-active .credit { color: var(--rank-faint); }
   gap: 4px;
 }
 .state-col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--muted);
   margin-bottom: 2px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, color 0.15s;
+}
+.state-col-head:hover { background: rgba(76, 201, 240, 0.1); color: #fff; }
+.state-col-head .cont-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0;
 }
 .state-col .country-toggle { width: 100%; }
 

@@ -2439,6 +2439,7 @@ function makeStateRow(s) {
     else selectedStates.delete(s.code);
     saveSettings();
     updateStateCount();
+    updateStateColCounts();
   });
   const span = document.createElement("span");
   span.textContent = s.name;
@@ -2448,7 +2449,8 @@ function makeStateRow(s) {
 }
 
 // Render every U.S. state as an individual toggle, respecting the search box,
-// split into two side-by-side parts (Left / Right columns).
+// split into two side-by-side parts (Left / Right columns). Each column has a
+// checkbox that selects/deselects all of its states (like the continent list).
 function renderStateList() {
   const container = $("#stateList");
   if (!container) return;
@@ -2464,10 +2466,23 @@ function renderStateList() {
   const buildCol = (items, label) => {
     const wrap = document.createElement("div");
     wrap.className = "state-col";
+    wrap.dataset.col = label.toLowerCase();
+
     const head = document.createElement("div");
     head.className = "state-col-head";
-    head.textContent = label;
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.className = "cont-check";
+    check.addEventListener("change", () => toggleStateCol(wrap));
+    const name = document.createElement("span");
+    name.textContent = label;
+    const badge = document.createElement("span");
+    badge.className = "cont-count";
+    head.appendChild(check);
+    head.appendChild(name);
+    head.appendChild(badge);
     wrap.appendChild(head);
+
     items.forEach(s => wrap.appendChild(makeStateRow(s)));
     return wrap;
   };
@@ -2476,6 +2491,38 @@ function renderStateList() {
   container.appendChild(buildCol(visible.slice(half), "Right"));
 
   updateStateCount();
+  updateStateColCounts();
+}
+
+// Toggle every state inside a Left/Right column heading.
+function toggleStateCol(col) {
+  const rows = [...col.querySelectorAll(".state-toggle input")];
+  if (!rows.length) return;
+  const allOn = rows.every(cb => cb.checked);
+  rows.forEach(cb => {
+    cb.checked = !allOn;
+    if (cb.checked) selectedStates.add(cb.dataset.id);
+    else selectedStates.delete(cb.dataset.id);
+  });
+  saveSettings();
+  updateStateCount();
+  updateStateColCounts();
+}
+
+// Refresh each column heading's checkbox + "selected / total" badge.
+function updateStateColCounts() {
+  document.querySelectorAll(".state-col").forEach(col => {
+    const rows = [...col.querySelectorAll(".state-toggle input")];
+    const total = rows.length;
+    const sel = rows.filter(cb => cb.checked).length;
+    const badge = col.querySelector(".cont-count");
+    if (badge) badge.textContent = sel + " / " + total;
+    const check = col.querySelector(".cont-check");
+    if (check) {
+      check.checked = total > 0 && sel === total;
+      check.indeterminate = sel > 0 && sel < total;
+    }
+  });
 }
 
 // Show a small "X / N selected" summary for the State List.
@@ -2492,6 +2539,7 @@ function setAllStates(on) {
   document.querySelectorAll("#stateList input").forEach(cb => { cb.checked = on; });
   saveSettings();
   updateStateCount();
+  updateStateColCounts();
 }
 
 // Country ids covered by 📚 Exam mode (the countries used by EXAM_CURRENCIES).
@@ -3102,6 +3150,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (head && !e.target.closest(".cont-check")) {
       e.preventDefault();
       toggleContinent(head);
+    }
+  });
+  // Same for the State List's Left/Right column headings.
+  document.addEventListener("click", e => {
+    const head = e.target.closest && e.target.closest(".state-col-head");
+    if (head && !e.target.closest(".cont-check")) {
+      e.preventDefault();
+      toggleStateCol(head.closest(".state-col"));
     }
   });
   // Exam mode disables the country toggle.
