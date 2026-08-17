@@ -33,13 +33,16 @@ function shuffle(arr) {
 
 // ================= Cheat mode (dev only) =================
 // Secret keybind: hold Shift and press F → R → L in sequence.
-// Only works when the game is opened as a LOCAL FILE (file://) — never on the
-// hosted website. When enabled, the correct country is circled automatically
+// Only works when the game is opened LOCALLY (file:// or localhost) — never on
+// the hosted website. When enabled, the correct country is circled automatically
 // on every new question for easy development/testing.
 let cheatMode = false;
 let cheatKeys = "";           // tracks the F-R-L sequence while Shift is held
 let cheatLastKeyTime = 0;
-const isLocalFile = typeof location !== "undefined" && location.protocol === "file:";
+const isLocalFile = typeof location !== "undefined"
+  && (location.protocol === "file:"
+    || location.hostname === "localhost"
+    || location.hostname === "127.0.0.1");
 
 // Tiny toast notification that appears regardless of the current screen.
 function showToast(msg, isGood) {
@@ -53,17 +56,33 @@ function showToast(msg, isGood) {
 function toggleCheatMode() {
   cheatMode = !cheatMode;
   if (cheatMode) {
-    showToast("🛠 CHEAT MODE ON — correct country circled", true);
-    // Ring the current question right away.
-    if (game && game.phase === "question") ringCorrectForDev();
+    showToast("🛠 CHEAT MODE ON", true);
+    // Reveal the current answer right away.
+    if (game && game.phase === "question") {
+      if (game.subject === "shape") {
+        // Shape mode shows only one country — reveal the name in the prompt box.
+        const q = game.questions[game.index];
+        $("#currencyName").textContent = q.name;
+        $("#currencySymbol").textContent = q.code || "";
+      } else {
+        ringCorrectForDev();
+      }
+    }
   } else {
     showToast("🛠 CHEAT MODE OFF", false);
+    // Put the shape prompt back if a shape question is on screen.
+    if (game && game.phase === "question" && game.subject === "shape") {
+      $("#currencyName").textContent = "What country is this?";
+      $("#currencySymbol").textContent = "";
+    }
   }
 }
 
 // Draws the green ring + fill on the current question's correct country.
 function ringCorrectForDev() {
   if (!game || !cheatMode) return;
+  // Shape mode has no ring — it reveals the answer name instead.
+  if (game.subject === "shape") return;
   const q = game.questions[game.index];
   resetCountryClasses();
   markCountries(q.countries, "correct");
@@ -177,13 +196,13 @@ const selectedCountries = new Set();
 // COUNTRY CODES mode's own question list. Empty means "all".
 const selectedCodes = new Set();
 
-// ===== Subject (Currency world map / Country Codes map vs U.S. States map) =====
-// The active subject ("currency" | "states" | "codes"). The world-map globals
-// above (countryFeatures/countryBoundaries/countryById/countryList) are
+// ===== Subject (Currency / Country Codes / Shape world map vs U.S. States map) =====
+// The active subject ("currency" | "states" | "codes" | "shape"). The world-map
+// globals above (countryFeatures/countryBoundaries/countryById/countryList) are
 // re-pointed to the state datasets when the subject is "states", so every map
 // function (labels, hit-testing, rings, names) works for both maps unchanged.
-// "codes" is the world map too — it just asks the short 2-letter code instead
-// of the currency.
+// "codes" and "shape" both use the world map too — codes asks the short 2-letter
+// code, shape highlights one country and you type its name.
 let gameSubject = "currency";
 
 // Frozen world datasets (built once in initMap) so we can swap back to them.
@@ -248,7 +267,7 @@ function activateSubject(subject) {
     countryById = stateById;
     countryList = stateList;
   } else {
-    // "currency" and "codes" both play on the world map.
+    // "currency", "codes", and "shape" all play on the world map.
     countryFeatures = worldFeatures;
     countryBoundaries = worldBoundaries;
     countryById = worldById;
@@ -265,6 +284,15 @@ function codedCountries() {
   countryList.forEach(c => {
     if (COUNTRY_CODES[c.id]) byId.set(c.id, { ...c, code: COUNTRY_CODES[c.id] });
   });
+  return [...byId.values()];
+}
+
+// Canonical country list for SHAPE mode: every mapped country, deduplicated
+// by id (same reasoning as codedCountries — keeps "Australia" over the shared
+// id-36 outpost so the typed answer matches the map label).
+function shapeCountries() {
+  const byId = new Map();
+  countryList.forEach(c => byId.set(c.id, c));
   return [...byId.values()];
 }
 
@@ -312,7 +340,7 @@ function initMap() {
   path = d3.geoPath(projection);
 
   zoomBehavior = d3.zoom()
-    .scaleExtent([1, 12])
+    .scaleExtent([1, 100])
     .clickDistance(5)
     .on("zoom", ev => scheduleZoom(ev.transform));
 
@@ -419,11 +447,15 @@ function initMap() {
 }
 
 // Switch the active map between "currency" (world), "codes" (world, prompts
-// the 2-letter country code), and "states" (US). Re-points the active feature
-// globals and re-renders the map paths.
+// the 2-letter country code), "shape" (world, type the highlighted country's
+// name), and "states" (US). Re-points the active feature globals and
+// re-renders the map paths.
 function setSubject(subject) {
-  if (subject !== "states" && subject !== "codes") subject = "currency";
+  if (subject !== "states" && subject !== "codes" && subject !== "shape") subject = "currency";
   activateSubject(subject);
+  showFullMap();
+  // Shape mode locks the map: the country stays centered and pan/zoom is off.
+  if (zoomBehavior) zoomBehavior.filter(() => gameSubject !== "shape");
   if (!mapG) return;
 
   const isStates = subject === "states";
@@ -445,9 +477,11 @@ function setSubject(subject) {
       .attr("class", "country")
       .attr("data-id", d => d.id)
       .attr("pointer-events", "visible")
-      .on("mousemove", ev => moveTooltip(ev))
-      .on("mouseover", (ev, d) => showTooltip(ev, nameOf(d.id)))
-      .on("mouseout", hideTooltip);
+      // Shape mode hides the hover tooltip: the country name would give the
+      // answer away before you type it.
+      .on("mousemove", subject === "shape" ? null : ev => moveTooltip(ev))
+      .on("mouseover", subject === "shape" ? null : (ev, d) => showTooltip(ev, nameOf(d.id)))
+      .on("mouseout", subject === "shape" ? null : hideTooltip);
 
   highlightG.raise();
 
@@ -531,6 +565,27 @@ function scheduleZoom(transform) {
   });
 }
 
+// Shape mode: zoom the map in so ONLY the target country fills the viewport —
+// you recognize the country from its shape alone. Applies the transform
+// directly (bypassing d3-zoom's scale clamp, which is far too small to fit a
+// tiny country).
+function zoomToCountry(id) {
+  const f = countryFeatures.find(c => c.id === id);
+  if (!f || !path || !projection) return;
+  const b = path.bounds(f);
+  if (!isFinite(b[0][0]) || !isFinite(b[1][0]) || !isFinite(b[0][1]) || !isFinite(b[1][1])) return;
+  const [[x0, y0], [x1, y1]] = b;
+  const w = svgW || 800;
+  const h = svgH || 500;
+  const k = Math.min(100, 0.9 / Math.max((x1 - x0) / w, (y1 - y0) / h));
+  const tx = w / 2 - k * (x0 + x1) / 2;
+  const ty = h / 2 - k * (y0 + y1) / 2;
+  const z = d3.zoomIdentity.translate(tx, ty).scale(k);
+  currentZoom = z;
+  if (mapG) mapG.attr("transform", z);
+  renderLabels();
+}
+
 function renderLabels() {
   const zoom = currentZoom || d3.zoomIdentity;
 
@@ -598,9 +653,10 @@ let game = null;
 // the user misclicks a wrong nearby country. If the correct answer country is
 // anywhere inside the radius of the click point, it counts as correct.
 function onCountryClick(event) {
-  if (game && game.phase === "question") {
-    resolveQuestionByRadius(event);
-  }
+  if (!game || game.phase !== "question") return;
+  // Shape mode is answered by typing — map taps do nothing.
+  if (game.subject === "shape") return;
+  resolveQuestionByRadius(event);
 }
 
 // Clicking the ocean (transparent layer under countries) snaps to the nearest
@@ -610,6 +666,9 @@ function onCountryClick(event) {
 
 function resolveQuestionByRadius(event) {
   if (!game || game.phase !== "question") return;
+  // Shape mode is answered by typing — taps on the map do nothing (this is
+  // the real tap path; onCountryClick is a secondary guard).
+  if (game.subject === "shape") return;
 
   const svgRect = svg.node().getBoundingClientRect();
   const px = event.clientX - svgRect.left;
@@ -715,7 +774,17 @@ function hideTooltip() {
 function resetCountryClasses() {
   mapG.selectAll("path.country")
       .classed("correct", false)
-      .classed("wrong", false);
+      .classed("wrong", false)
+      .classed("shape-target", false);
+}
+
+// Shape mode hides every country except the target so only ONE shape shows.
+// Restore the full world map (ocean, graticule, all countries) when revealing
+// the answer or leaving shape mode.
+function showFullMap() {
+  if (!mapG) return;
+  mapG.selectAll("path.country").classed("shape-hide", false);
+  mapG.selectAll(".ocean, .sphere, .graticule").classed("shape-hide", false);
 }
 
 // JS-driven answer pulse: rapidly flashes the revealed countries' fill so the
@@ -1016,6 +1085,10 @@ function resetGameScreen() {
   $("#guessBar").classList.remove("low");
   $("#guessBar").style.width = "100%";
 
+  // Hide the shape-mode typing box and restore the full world map.
+  closeShapeGuess();
+  showFullMap();
+
   // Hide the replay timeline and results details panel.
   $("#replayTimeline").classList.add("hidden");
   $("#resultsDetails").classList.add("hidden");
@@ -1032,10 +1105,14 @@ function startGame() {
   const rankMode = $("#rankModeInput").checked;
   const playerName = $("#playerNameInput").value.trim();
 
-  // Rank mode means "how many rounds you play" — it does NOT change the
-  // difficulty. All settings (time, guesses, interval, hints) come from the
-  // normal casual settings; only the round count differs.
-  const guessSec = Math.max(1, parseInt($("#guessTimeInput").value, 10) || 7);
+  // Rank mode forces the harder values (13s guess time, no names on the map,
+  // a tighter click radius); the rest of the difficulty inputs (guesses,
+  // interval) keep the user's own casual settings, and the round count comes
+  // from the rank picker.
+  // Guess time: ranked forces 13s, casual uses the setting (default 20s).
+  const guessSec = rankMode
+    ? 13
+    : Math.max(1, parseInt($("#guessTimeInput").value, 10) || 20);
   const intervalEnabled = $("#intervalToggleInput").checked;
   const intervalSec = intervalEnabled
     ? Math.max(0, parseInt($("#intervalTimeInput").value, 10) || 3)
@@ -1052,15 +1129,20 @@ function startGame() {
 
   // Read display & sound preferences for this session. The "show full name"
   // toggle is per-subject (country vs state) and is always forced off in rank.
-  // Country Codes mode always shows the short code, never the full name.
+  // Country Codes mode always shows the short code, never the full name, and
+  // Shape mode never shows the name (that's the answer!).
   const showFullName = rankMode
     ? false
     : (gameSubject === "states"
       ? $("#showFullStateNameInput").checked
-      : (gameSubject === "codes"
+      : (gameSubject === "codes" || gameSubject === "shape"
         ? false
         : $("#showFullCountryNameInput").checked));
-  const showCountryNames = rankMode ? false : $("#showCountryNamesInput").checked;
+  // Shape mode also hides the country-name labels on the map — hovering or
+  // labels would reveal the answer.
+  const showCountryNames = (rankMode || gameSubject === "shape")
+    ? false
+    : $("#showCountryNamesInput").checked;
   const tapSelect = $("#tapSelectInput").checked;
   soundsEnabled = $("#soundInput").checked;
 
@@ -1068,11 +1150,10 @@ function startGame() {
   // is set, so the answer pulse never overlaps the pause between rounds.
   setPulse(intervalSec > 0 ? false : $("#pulseToggleInput").checked);
 
-  // 📚 Exam mode: ON = only the classic study list.
-  // OFF = every currency in data.js is a playable target (currently covers
-  // all countries on the map with real currencies). Works in both casual and
-  // ranked play.
-  const examMode = $("#examModeInput").checked;
+  // 📚 Exam mode: ON = only the exam countries (large countries in Europe,
+  // South America, and Africa) in any world-map subject. OFF = every country
+  // is a playable target. States mode always ignores exam mode.
+  const examMode = gameSubject !== "states" && $("#examModeInput").checked;
 
   // Browsers block audio until a user gesture; Start click counts as one.
   ensureAudio();
@@ -1114,18 +1195,35 @@ function startGame() {
     if (!rankMode && selectedCodes.size > 0 && selectedCodes.size < countryList.length) {
       questions = questions.filter(q => q.countries.some(id => selectedCodes.has(id)));
     }
+    // 📚 Exam mode: only large countries in Europe / South America / Africa.
+    if (examMode) {
+      questions = questions.filter(q => q.countries.some(id => EXAM_COUNTRIES.has(id)));
+    }
     if (questions.length === 0) {
       showToast("⚠ No countries selected — enable at least one country in Settings → Question Lists → Country Code List", false);
       return;
     }
+  } else if (gameSubject === "shape") {
+    // Shape mode: one highlighted country per question; you type its name.
+    // Every mapped country (deduped by id) is a question — no question list
+    // toggle, so the full world is always in play (Rounds still caps it).
+    questions = shapeCountries().map(c => ({
+      code: COUNTRY_CODES[c.id] || "",
+      name: c.name,
+      symbol: "",
+      countries: [c.id]       // the numeric id of the country itself
+    }));
+    // 📚 Exam mode: only large countries in Europe / South America / Africa.
+    if (examMode) {
+      questions = questions.filter(q => q.countries.some(id => EXAM_COUNTRIES.has(id)));
+    }
   } else {
     // Currency mode: build from the real currency data. In 📚 Exam mode,
-    // restrict to ONLY the classic study list (EXAM_CURRENCIES). Otherwise use
-    // every currency in data.js.
+    // restrict to currencies used by the exam countries (large countries in
+    // Europe / South America / Africa). Otherwise use every currency.
     questions = CURRENCIES.map(c => ({ ...c }));
     if (examMode) {
-      const examSet = new Set(EXAM_CURRENCIES);
-      questions = questions.filter(c => examSet.has(c.code));
+      questions = questions.filter(c => c.countries.some(id => EXAM_COUNTRIES.has(id)));
     }
     // Country toggle: only in casual (not ranked, not exam). Restrict to
     // currencies used by the toggled-on countries, if any are unselected.
@@ -1212,7 +1310,12 @@ function startGame() {
         const active = selectedCodes.size > 0 && selectedCodes.size < countryList.length
           ? [...selectedCodes]
           : allCoded;
-        return { normal: active, ranked: allCoded, exam: allCoded };
+        return { normal: active, ranked: allCoded, exam: [...examCountryIds()] };
+      }
+      // Shape mode: the whole world is always in play (no question list).
+      if (gameSubject === "shape") {
+        const allShapes = shapeCountries().map(c => c.id);
+        return { normal: allShapes, ranked: allShapes, exam: [...examCountryIds()] };
       }
       // In exam mode the toggle selection is temporarily swapped to the exam
       // list, so "Normal Mode" should reflect the user's real selection.
@@ -1270,7 +1373,9 @@ function startGame() {
   $("#streakCount").textContent = "0";
   $("#streakMult").classList.toggle("hidden", !rankMode);
 
-  if (rankMode) {
+  // Shape mode skips the countdown so the typing box focuses immediately —
+  // on iOS the keyboard opens in the same tap that started the game.
+  if (rankMode && gameSubject !== "shape") {
     startRankCountdown();
   } else {
     showQuestion();
@@ -1351,21 +1456,29 @@ function showQuestion() {
     }, 750);
   }
 
-  $("#currencyBox").classList.toggle("code-only", !game.showFullName);
-  if (game.showFullName) {
-    $("#currencyName").textContent = q.name;
+  if (game.subject === "shape") {
+    // Shape mode: the prompt is the highlighted country itself — the box just
+    // says what to do, and the typing input appears over the map.
+    $("#currencyBox").classList.remove("code-only");
+    $("#currencyName").textContent = "What country is this?";
+    $("#currencySymbol").textContent = "";
   } else {
-    $("#currencyName").textContent = q.code;
-  }
-  // States show just the abbreviation under the name; currencies show the
-  // symbol + code. Country Codes mode shows the code as the prompt (the
-  // full name is only shown after the answer is revealed).
-  if (game.subject === "states") {
-    $("#currencySymbol").textContent = q.symbol || "";
-  } else if (game.subject === "codes") {
-    $("#currencySymbol").textContent = game.showFullName ? q.name : "";
-  } else {
-    $("#currencySymbol").textContent = q.symbol ? `${q.symbol}   ·   ${q.code}` : q.code;
+    $("#currencyBox").classList.toggle("code-only", !game.showFullName);
+    if (game.showFullName) {
+      $("#currencyName").textContent = q.name;
+    } else {
+      $("#currencyName").textContent = q.code;
+    }
+    // States show just the abbreviation under the name; currencies show the
+    // symbol + code. Country Codes mode shows the code as the prompt (the
+    // full name is only shown after the answer is revealed).
+    if (game.subject === "states") {
+      $("#currencySymbol").textContent = q.symbol || "";
+    } else if (game.subject === "codes") {
+      $("#currencySymbol").textContent = game.showFullName ? q.name : "";
+    } else {
+      $("#currencySymbol").textContent = q.symbol ? `${q.symbol}   ·   ${q.code}` : q.code;
+    }
   }
   $("#progress").textContent = `${game.index + 1} / ${game.total}`;
 
@@ -1373,8 +1486,26 @@ function showQuestion() {
   if (!preservePulse) clearFlash();
   hideFeedback();
 
-  // Cheat mode (local only): auto-circle the correct country for dev.
-  if (cheatMode && isLocalFile) ringCorrectForDev();
+  // Shape mode: show the typing box, zoom to ONLY the target country, hide
+  // every other country (plus the ocean) so just its shape is on screen, and
+  // light it up so you recognize it from its shape alone. No pulsing ring.
+  if (game.subject === "shape") {
+    showShapeGuess();
+    zoomToCountry(q.countries[0]);
+    mapG.selectAll("path.country")
+        .classed("shape-hide", d => d.id !== q.countries[0]);
+    mapG.selectAll(".ocean, .sphere, .graticule").classed("shape-hide", true);
+    markCountries([q.countries[0]], "shape-target");
+    // Cheat mode (local only): reveal the answer name in the prompt box.
+    if (cheatMode && isLocalFile) {
+      $("#currencyName").textContent = q.name;
+      $("#currencySymbol").textContent = q.code || "";
+    }
+  }
+
+  // Cheat mode (local only): auto-circle the correct country for dev (shape
+  // mode reveals the name instead, handled above).
+  if (cheatMode && isLocalFile && game.subject !== "shape") ringCorrectForDev();
 
   $("#guessBar").classList.remove("low");
   startGuessTimer();
@@ -1389,6 +1520,170 @@ function streakBonusFor(n) {
   if (n < 20) return 100;
   if (n < 30) return 250;
   return 500;
+}
+
+// ================= Shape mode: type-the-country-name =================
+// The map lights up one country and you type its name into a box with live
+// suggestions ("tha" → Thailand, "a" → Australia, Austria, …). Clicking a
+// suggestion (or Enter) submits the answer.
+let shapeMatches = [];      // current suggestion list (shapeCountries entries)
+let shapeSelIndex = -1;     // keyboard-highlighted suggestion
+
+function showShapeGuess() {
+  const wrap = $("#shapeGuess");
+  if (wrap) wrap.classList.remove("hidden");
+  const input = $("#shapeInput");
+  if (input) {
+    input.value = "";
+    // Focus synchronously (inside the Start tap) so the mobile keyboard opens
+    // on its own — no need to tap the answer box.
+    input.focus({ preventScroll: true });
+  }
+  const box = $("#shapeSuggest");
+  if (box) box.classList.add("hidden");
+  shapeMatches = [];
+  shapeSelIndex = -1;
+  // The map is locked while answering — hide the Reset View button.
+  const resetBtn = $("#resetViewBtn");
+  if (resetBtn) resetBtn.classList.add("hidden");
+}
+
+function closeShapeGuess() {
+  const wrap = $("#shapeGuess");
+  if (wrap) wrap.classList.add("hidden");
+  const box = $("#shapeSuggest");
+  if (box) box.classList.add("hidden");
+  shapeMatches = [];
+  shapeSelIndex = -1;
+  const resetBtn = $("#resetViewBtn");
+  if (resetBtn) resetBtn.classList.remove("hidden");
+}
+
+function highlightShapeSel() {
+  const box = $("#shapeSuggest");
+  if (!box) return;
+  [...box.children].forEach((el, i) => el.classList.toggle("sel", i === shapeSelIndex));
+}
+
+function renderShapeSuggest() {
+  const input = $("#shapeInput");
+  const box = $("#shapeSuggest");
+  if (!input || !box) return;
+  const val = input.value.trim().toLowerCase();
+  if (!val || !game || game.phase !== "question" || game.subject !== "shape") {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    shapeMatches = [];
+    shapeSelIndex = -1;
+    return;
+  }
+  shapeMatches = shapeCountries()
+    .filter(c => c.name.toLowerCase().startsWith(val))
+    .slice(0, 20);
+  if (shapeMatches.length === 0) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    shapeSelIndex = -1;
+    return;
+  }
+  box.innerHTML = "";
+  shapeMatches.forEach(c => {
+    const row = document.createElement("div");
+    row.className = "shape-opt";
+    row.textContent = c.name;
+    // mousedown (not click) so picking works before the input's blur hides it.
+    row.addEventListener("mousedown", ev => {
+      ev.preventDefault();
+      submitShapeAnswer(c.name);
+    });
+    box.appendChild(row);
+  });
+  box.classList.remove("hidden");
+  shapeSelIndex = 0;
+  highlightShapeSel();
+}
+
+function onShapeKeydown(e) {
+  if (!game || game.phase !== "question" || game.subject !== "shape") return;
+  const box = $("#shapeSuggest");
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (shapeMatches.length) {
+      shapeSelIndex = (shapeSelIndex + 1) % shapeMatches.length;
+      highlightShapeSel();
+    }
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    if (shapeMatches.length) {
+      shapeSelIndex = (shapeSelIndex - 1 + shapeMatches.length) % shapeMatches.length;
+      highlightShapeSel();
+    }
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    // One suggestion left? Submit it directly. Otherwise submit the
+    // highlighted one (or the raw typed text if nothing is highlighted).
+    if (shapeMatches.length === 1) {
+      submitShapeAnswer(shapeMatches[0].name);
+    } else if (shapeMatches.length > 1 && shapeSelIndex >= 0) {
+      submitShapeAnswer(shapeMatches[shapeSelIndex].name);
+    } else {
+      submitShapeAnswer($("#shapeInput").value);
+    }
+  } else if (e.key === "Escape") {
+    if (box) box.classList.add("hidden");
+    shapeMatches = [];
+    shapeSelIndex = -1;
+  }
+}
+
+function submitShapeAnswer(name) {
+  if (!game || game.phase !== "question" || game.subject !== "shape") return;
+  const input = $("#shapeInput");
+  const box = $("#shapeSuggest");
+  if (box) box.classList.add("hidden");
+  shapeMatches = [];
+  shapeSelIndex = -1;
+  if (input) input.value = "";
+  const guess = String(name || "").trim();
+  if (!guess) return;
+  const q = game.questions[game.index];
+  if (guess.toLowerCase() === q.name.toLowerCase()) {
+    resolveQuestion(q.countries[0]);
+  } else {
+    handleTypedWrong();
+  }
+}
+
+// A wrong typed name: same guess-decrement rules as a wrong map click, but
+// there's no country on the map to mark as wrong.
+function handleTypedWrong() {
+  if (!game || game.phase !== "question") return;
+  const q = game.questions[game.index];
+  playSound("wrong");
+  replayRecord("answer", { index: game.index, clickedId: null, correct: false });
+
+  // A wrong guess resets the streak in EVERY mode (casual + ranked).
+  if (game.streak > 0) {
+    game.streak = 0;
+    updateStreakPill();
+  }
+
+  game.guessesLeft--;
+  updateGuessesDisplay();
+
+  if (game.guessesLeft > 0) {
+    // Remaining attempts on the SAME question — keep the box open to retype.
+    const plural = game.guessesLeft === 1 ? "guess" : "guesses";
+    showFeedback("no", `❌ Wrong! ${game.guessesLeft} ${plural} left — try again`);
+    const input = $("#shapeInput");
+    if (input) setTimeout(() => input.focus(), 30);
+  } else {
+    // Out of attempts — mark failed and reveal the answer.
+    game.incorrect++;
+    finishQuestion(q);
+    showFeedback("no", `❌ Out of guesses! The answer was: ${q.name}`);
+    updateScoreDisplay();
+  }
 }
 
 function resolveQuestion(clickedId) {
@@ -1406,7 +1701,7 @@ function resolveQuestion(clickedId) {
       updateStreakPill();
     }
     finishQuestion(q);
-    if (game.subject === "states" || game.subject === "codes") {
+    if (game.subject === "states" || game.subject === "codes" || game.subject === "shape") {
       showFeedback("info", `⏰ Time's up! The answer was: ${q.name}`);
     } else {
       showFeedback("info", `⏰ Time's up! ${q.name} is used in: ${answerLabelFor(q)}`);
@@ -1458,6 +1753,8 @@ function resolveQuestion(clickedId) {
         showFeedback("ok", `✅ Correct! ${q.name} (+${speedBonus} speed)`);
       } else if (game.subject === "codes") {
         showFeedback("ok", `✅ Correct! ${q.code} → ${q.name} (+${speedBonus} speed)`);
+      } else if (game.subject === "shape") {
+        showFeedback("ok", `✅ Correct! ${q.name} (+${speedBonus} speed)`);
       } else {
         showFeedback("ok", `✅ Correct! ${q.name} → ${shown} (+${speedBonus} speed)`);
       }
@@ -1470,6 +1767,8 @@ function resolveQuestion(clickedId) {
         showFeedback("ok", `✅ Correct! ${q.name}`);
       } else if (game.subject === "codes") {
         showFeedback("ok", `✅ Correct! ${q.code} → ${q.name}`);
+      } else if (game.subject === "shape") {
+        showFeedback("ok", `✅ Correct! ${q.name}`);
       } else {
         showFeedback("ok", `✅ Correct! ${q.name} → ${shown}`);
       }
@@ -1507,7 +1806,7 @@ function resolveQuestion(clickedId) {
     // Out of attempts — mark failed and reveal the answer.
     game.incorrect++;
     finishQuestion(q);
-    if (game.subject === "states" || game.subject === "codes") {
+    if (game.subject === "states" || game.subject === "codes" || game.subject === "shape") {
       showFeedback("no", `❌ Out of guesses! The answer was: ${q.name}`);
     } else {
       showFeedback("no", `❌ Out of guesses! ${q.name} is used in: ${answerLabelFor(q)}`);
@@ -1537,6 +1836,13 @@ function finishQuestion(q) {
   // Always reveal the full currency name once the answer is in.
   $("#currencyBox").classList.remove("code-only");
   $("#currencyName").textContent = q.name;
+
+  // Shape mode: the typing box is done for this round — hide it and bring the
+  // whole world back so the reveal shows where the country sits.
+  if (game.subject === "shape") {
+    closeShapeGuess();
+    showFullMap();
+  }
 
   const isFinal = game.index === game.total - 1;
 
@@ -1818,7 +2124,9 @@ function runReplay(data) {
   $("#countdownOverlay").classList.add("hidden");
 
   // Swap the map to the recorded subject so rings/labels/hit-testing line up.
-  const subj = m.subject === "states" ? "states" : (m.subject === "codes" ? "codes" : "currency");
+  const subj = m.subject === "states" ? "states"
+    : (m.subject === "codes" ? "codes"
+      : (m.subject === "shape" ? "shape" : "currency"));
   setSubject(subj);
 
   game = {
@@ -2039,14 +2347,23 @@ function applyReplayEvent(ev) {
           }
         }
         updateGuessesDisplay();
-        $("#currencyBox").classList.toggle("code-only", !game.showFullName);
-        $("#currencyName").textContent = game.showFullName ? q.name : q.code;
-        if (game.subject === "states") {
-          $("#currencySymbol").textContent = q.symbol || "";
-        } else if (game.subject === "codes") {
-          $("#currencySymbol").textContent = game.showFullName ? q.name : "";
+        if (game.subject === "shape") {
+          // Shape replays show the highlight on the map; the typing box stays
+          // hidden during playback.
+          $("#currencyBox").classList.remove("code-only");
+          $("#currencyName").textContent = "What country is this?";
+          $("#currencySymbol").textContent = "";
+          closeShapeGuess();
         } else {
-          $("#currencySymbol").textContent = q.symbol ? `${q.symbol}   ·   ${q.code}` : q.code;
+          $("#currencyBox").classList.toggle("code-only", !game.showFullName);
+          $("#currencyName").textContent = game.showFullName ? q.name : q.code;
+          if (game.subject === "states") {
+            $("#currencySymbol").textContent = q.symbol || "";
+          } else if (game.subject === "codes") {
+            $("#currencySymbol").textContent = game.showFullName ? q.name : "";
+          } else {
+            $("#currencySymbol").textContent = q.symbol ? `${q.symbol}   ·   ${q.code}` : q.code;
+          }
         }
         $("#progress").textContent = `${d.index + 1} / ${game.total}`;
         resetCountryClasses();
@@ -2181,14 +2498,21 @@ window.addEventListener("error", ev => {
 // ================= Rank mode menu toggle =================
 // When rank mode is switched ON the menu visibly changes (the whole menu turns
 // red, the full-name toggles are forced off) and ranked play uses fixed hard
-// values: 1 guess, no interval, 150 km click radius on the world map
-// (currency & codes) and 50 km for states. The casual inputs keep the user's
-// own values and are restored when rank is switched off.
+// values: 13s guess time, no names on the map, and a tighter click radius
+// (150 km on the world map for currency/codes/shape, 50 km for states). The
+// casual inputs keep the user's own values and are restored when rank is
+// switched off.
 const RANK_BODY_CLASS = "rank-active";
 
-// Sizes of the two question pools, used to bound the Rounds input.
-const EXAM_LIST = new Set(EXAM_CURRENCIES);
-const EXAM_COUNT = CURRENCIES.filter(c => EXAM_LIST.has(c.code)).length;
+// 📚 Exam mode = large countries in Europe, South America, and Africa (area
+// ≥ 300,000 km², computed from the map geometry). When Exam Mode is on, these
+// are the only countries that can appear in any world-map subject.
+const EXAM_COUNTRIES = new Set([
+  12, 24, 32, 68, 72, 76, 120, 140, 148, 152, 170, 178, 180, 231, 246, 250, 276,
+  380, 384, 404, 434, 450, 466, 478, 504, 508, 516, 562, 566, 578, 600, 604,
+  616, 643, 706, 710, 716, 724, 728, 729, 752, 804, 818, 834, 862, 894
+]);
+const EXAM_COUNT = EXAM_COUNTRIES.size;
 const FULL_COUNT = CURRENCIES.length;
 
 // Bound the Rounds input to the size of the active pool: EXAM_COUNT in 📚
@@ -2200,7 +2524,9 @@ function syncRoundsMax() {
     ? US_STATE_LIST.length
     : (gameSubject === "codes"
       ? codedCountries().length
-      : ($("#examModeInput").checked ? EXAM_COUNT : FULL_COUNT));
+      : (gameSubject === "shape"
+        ? shapeCountries().length
+        : ($("#examModeInput").checked ? EXAM_COUNT : FULL_COUNT)));
   roundsEl.max = max;
   const v = parseInt(roundsEl.value, 10);
   if (Number.isFinite(v) && v > roundsEl.max) roundsEl.value = roundsEl.max;
@@ -2329,7 +2655,10 @@ function loadSettings() {
     if (d.themeNormal !== undefined) $("#themeNormalInput").value = d.themeNormal;
     if (d.themeRank !== undefined) $("#themeRankInput").value = d.themeRank;
     if (d.sound !== undefined) $("#soundInput").checked = !!d.sound;
-    if (d.examMode !== undefined) $("#examModeInput").checked = !!d.examMode;
+    if (d.examMode !== undefined) {
+      $("#examModeInput").checked = !!d.examMode;
+      $("#menuExamModeInput").checked = !!d.examMode;
+    }
     if (d.playerName !== undefined) $("#playerNameInput").value = d.playerName;
     if (Array.isArray(d.countries)) {
       selectedCountries.clear();
@@ -2595,21 +2924,18 @@ function setAllStates(on) {
   updateContinentCounts(document.getElementById("stateList"));
 }
 
-// Country ids covered by 📚 Exam mode (the countries used by EXAM_CURRENCIES).
+// Country ids covered by 📚 Exam mode (large countries in Europe, South
+// America, and Africa).
 let savedCountriesBeforeExam = null;
 
 function examCountryIds() {
-  const examSet = new Set(EXAM_CURRENCIES);
-  const ids = new Set();
-  CURRENCIES.forEach(c => {
-    if (examSet.has(c.code)) c.countries.forEach(id => ids.add(id));
-  });
-  return ids;
+  return EXAM_COUNTRIES;
 }
 
 // When 📚 Exam mode is ON, the Country toggle is ignored and disabled, and its
 // selection is switched to match the exam list. Turning it OFF restores the
-// selection the user had before.
+// selection the user had before. The Country Code list is disabled too — exam
+// mode fixes the countries for every world-map subject.
 function syncCountriesState() {
   const examOn = $("#examModeInput").checked;
   if (examOn) {
@@ -2632,7 +2958,30 @@ function syncCountriesState() {
   $("#countryNoneBtn").disabled = disabled;
   $("#countriesDisabledNote").classList.toggle("hidden", !disabled);
 
+  document.querySelectorAll("#codesList input").forEach(cb => { cb.disabled = disabled; });
+  $("#codesSearch").disabled = disabled;
+  $("#codesAllBtn").disabled = disabled;
+  $("#codesNoneBtn").disabled = disabled;
+  $("#codesDisabledNote").classList.toggle("hidden", !disabled);
+
   saveSettings();
+}
+
+// Keep the two 📚 Exam toggles (main menu + Settings) in sync and apply the
+// exam state: rounds default/max and the disabled question lists.
+function setExamMode(on) {
+  $("#examModeInput").checked = !!on;
+  $("#menuExamModeInput").checked = !!on;
+  const roundsEl = $("#roundsInput");
+  if (roundsEl.dataset.pref === undefined) {
+    roundsEl.dataset.pref = roundsEl.value;
+  }
+  const ranked = $("#rankModeInput").checked;
+  roundsEl.value = on
+    ? EXAM_COUNT
+    : (ranked ? 55 : 40);
+  syncRoundsMax();
+  syncCountriesState();
 }
 
 // Generic overlay open/close with a short fade/slide animation.
@@ -2659,9 +3008,11 @@ let pendingRankRounds = "all";
 // Open the rank-size picker (states always plays every state; codes and
 // currency let you choose a round count).
 function openRankPicker() {
-  // Country Codes mode: the pool is every mapped country with a code.
-  if (gameSubject === "codes") {
-    $("#rankAllCount").textContent = codedCountries().length;
+  // Country Codes and Shape modes: the pool is every mapped country.
+  if (gameSubject === "codes" || gameSubject === "shape") {
+    $("#rankAllCount").textContent = gameSubject === "codes"
+      ? codedCountries().length
+      : shapeCountries().length;
     openOverlay("rankPicker");
     return;
   }
@@ -2688,7 +3039,7 @@ function startRankMode(rounds) {
 // Default value per setting id (string/number for value inputs, boolean for
 // checkboxes). Used by the per-setting reset buttons.
 const SETTING_DEFAULTS = {
-  guessTimeInput: "7",
+  guessTimeInput: "20",
   intervalToggleInput: true,
   intervalTimeInput: "3",
   maxGuessesInput: "1",
@@ -2712,7 +3063,7 @@ const SETTING_DEFAULTS = {
 // Refresh anything that depends on a setting after it changes.
 function afterSettingChange(id) {
   if (id === "intervalToggleInput" || id === "intervalTimeInput") syncIntervalState();
-  if (id === "examModeInput") { syncCountriesState(); syncRoundsMax(); }
+  if (id === "examModeInput") setExamMode($("#examModeInput").checked);
   if (id === "roundsInput") syncRoundsMax();
   if (id === "themeNormalInput" || id === "themeRankInput") applyTheme();
   if (id === "pulseToggleInput") setPulse($("#pulseToggleInput").checked);
@@ -2752,7 +3103,7 @@ function addPerSettingReset() {
 }
 
 function resetDefaults() {
-  $("#guessTimeInput").value = 7;
+  $("#guessTimeInput").value = 20;
   $("#intervalToggleInput").checked = true;
   $("#intervalTimeInput").value = 3;
   $("#maxGuessesInput").value = 1;
@@ -2764,6 +3115,8 @@ function resetDefaults() {
   $("#showCountryNamesInput").checked = true;
   $("#soundInput").checked = true;
   $("#examModeInput").checked = false;
+  $("#menuExamModeInput").checked = false;
+  savedCountriesBeforeExam = null;
   $("#playerNameInput").value = "";
   $("#pulseToggleInput").checked = true;
   $("#themeNormalInput").value = "#4cc9f0";
@@ -2775,6 +3128,7 @@ function resetDefaults() {
   setAllStates(true);      // reset state toggles to all-on
   syncRoundsMax();
   syncIntervalState();
+  syncCountriesState();    // exam off -> country lists enabled again
   applyTheme();
   applyBgRate();
   setPulse(true);
@@ -3226,14 +3580,13 @@ document.addEventListener("DOMContentLoaded", () => {
       toggleContinent(head, selForList(head));
     }
   });
-  // Exam mode disables the country toggle.
+  // Exam mode disables the country toggles (initial state from saved settings).
   syncCountriesState();
-  $("#examModeInput").addEventListener("change", syncCountriesState);
 
-  // Mode buttons: CURRENCY / COUNTRY CODES / U.S. STATES. The RANKED switch
-  // controls rank mode. When on, CURRENCY and COUNTRY CODES open the rank-size
-  // picker (50/70/100/all); U.S. STATES goes straight to the map and plays
-  // every state.
+  // Mode buttons: CURRENCY / COUNTRY CODES / U.S. STATES / SHAPE. The RANKED
+  // switch controls rank mode. When on, CURRENCY, COUNTRY CODES, and SHAPE open
+  // the rank-size picker (50/70/100/all); U.S. STATES goes straight to the map
+  // and plays every state.
   $("#currencyBtn").addEventListener("click", () => {
     setSubject("currency");
     if ($("#rankModeInput").checked) {
@@ -3259,6 +3612,47 @@ document.addEventListener("DOMContentLoaded", () => {
       startGame();
     }
   });
+  $("#shapeBtn").addEventListener("click", () => {
+    setSubject("shape");
+    if ($("#rankModeInput").checked) {
+      openRankPicker();
+    } else {
+      startGame();
+    }
+  });
+
+  // Shape mode typing box: live suggestions + keyboard picking.
+  $("#shapeInput").addEventListener("input", renderShapeSuggest);
+  $("#shapeInput").addEventListener("keydown", onShapeKeydown);
+  $("#shapeInput").addEventListener("blur", () => {
+    // Small delay so a mousedown on a suggestion (which uses preventDefault)
+    // still wins before the box hides.
+    setTimeout(() => {
+      $("#shapeSuggest").classList.add("hidden");
+      shapeMatches = [];
+      shapeSelIndex = -1;
+    }, 150);
+  });
+
+  // Mobile: keep the game screen inside the visible area when the on-screen
+  // keyboard opens (the visual viewport shrinks). Without this, the keyboard
+  // covers the typing box on iPad/phone.
+  if (window.visualViewport) {
+    const applyVisualViewport = () => {
+      const gameScreen = $("#game");
+      if (!gameScreen || gameScreen.classList.contains("hidden")) return;
+      const vv = window.visualViewport;
+      gameScreen.style.top = vv.offsetTop + "px";
+      gameScreen.style.height = vv.height + "px";
+      if (typeof resizeMap === "function") resizeMap();
+      // Re-center the shape-mode country after the viewport shrinks.
+      if (game && game.phase === "question" && game.subject === "shape") {
+        zoomToCountry(game.questions[game.index].countries[0]);
+      }
+    };
+    window.visualViewport.addEventListener("resize", applyVisualViewport);
+    window.visualViewport.addEventListener("scroll", applyVisualViewport);
+  }
   // The RANKED switch: toggling it re-syncs the locked settings via
   // applyRankMenuState() (which also recolors the play buttons via the
   // body.rank-active class).
@@ -3306,20 +3700,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Interval Wait off => Interval Time disabled.
   $("#intervalToggleInput").addEventListener("change", syncIntervalState);
 
-  // Switching 📚 Exam mode adjusts the rounds default and max: EXAM_COUNT in
-  // 📚 mode, 40 default / FULL_COUNT max in casual. In ranked play (exam stays
-  // togglable) it updates the rounds to the exam list size as well.
-  $("#examModeInput").addEventListener("change", () => {
-    const roundsEl = $("#roundsInput");
-    if (roundsEl.dataset.pref === undefined) {
-      roundsEl.dataset.pref = roundsEl.value;
-    }
-    const ranked = $("#rankModeInput").checked;
-    roundsEl.value = $("#examModeInput").checked
-      ? EXAM_COUNT
-      : (ranked ? 55 : 40);
-    syncRoundsMax();
-  });
+  // 📚 Exam mode toggle lives BOTH on the main menu and in Settings — toggling
+  // either one syncs the other and re-applies the exam state.
+  $("#examModeInput").addEventListener("change", () => setExamMode($("#examModeInput").checked));
+  $("#menuExamModeInput").addEventListener("change", () => setExamMode($("#menuExamModeInput").checked));
 
   $("#playAgainBtn").addEventListener("click", startGame);
   $("#stopBtn").addEventListener("click", goToMenu);
@@ -3346,15 +3730,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }, true);
 
-  // Secret cheat keybind (Shift + F → R → L). Only works on LOCAL file://,
-  // never on the hosted website.
+  // Secret cheat keybind (Shift + F → R → L). Only works on local pages
+  // (file:// or localhost), never on the hosted website.
   if (isLocalFile) {
     window.addEventListener("keydown", e => {
       if (!e.shiftKey) { cheatKeys = ""; return; }
       const k = e.key.toLowerCase();
       const now = Date.now();
-      // Reset if too much time between presses.
-      if (now - cheatLastKeyTime > 1500) cheatKeys = "";
+      // Reset if too much time between presses (2s for a relaxed combo).
+      if (now - cheatLastKeyTime > 2000) cheatKeys = "";
       cheatLastKeyTime = now;
       cheatKeys += k;
       if (!cheatKeys.startsWith("f")) { cheatKeys = k === "f" ? "f" : ""; }

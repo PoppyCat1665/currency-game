@@ -308,6 +308,59 @@ input[type="number"] {
   font-size: 14px;
 }
 
+/* Blue exam-mode toggle on the main menu (mirrors the settings toggle). */
+.exam-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0 18px;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.exam-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.exam-label {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.exam-toggle:hover { filter: brightness(1.15); }
+
+.exam-toggle:has(input:checked) {
+  background: rgba(var(--acc-rgb), 0.18);
+  border-color: var(--accent);
+  box-shadow: 0 0 14px var(--primary-shadow);
+}
+
+.exam-toggle:has(input:checked) .exam-label {
+  color: #fff;
+  text-shadow: 0 0 10px var(--primary-shadow);
+}
+
+/* Ranked + Exam switches side by side above the mode buttons. */
+.mode-switches {
+  display: flex;
+  gap: 10px;
+}
+.mode-switches .mode-switch { flex: 1; }
+.mode-switches .exam-label { font-size: 18px; letter-spacing: 2px; }
+
 /* ---------- Buttons ---------- */
 .btn {
   border: none;
@@ -576,6 +629,57 @@ input[type="number"] {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
 }
 
+/* Shape mode: type-the-answer box floating over the map. */
+.shape-guess {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(340px, 82%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.shape-guess #shapeInput {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(13, 21, 48, 0.92);
+  color: var(--text);
+  font-size: 16px;
+  text-align: center;
+  outline: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.shape-guess #shapeInput:focus { border-color: var(--accent); }
+.shape-guess #shapeInput::placeholder { color: var(--muted); }
+.shape-suggest {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(13, 21, 48, 0.96);
+  overflow-y: auto;
+  max-height: 220px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.shape-opt {
+  padding: 9px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.shape-opt:last-child { border-bottom: none; }
+.shape-opt:hover,
+.shape-opt.sel { background: rgba(76, 201, 240, 0.18); color: #fff; }
+
+/* On small screens keep the suggestions compact so they stay above the
+   on-screen keyboard. */
+@media (max-width: 600px) {
+  .shape-suggest { max-height: 32vh; }
+  .shape-guess { top: 8px; }
+}
+
 /* Replay cursor: shows where the player's pointer was during the run. */
 .replay-cursor {
   position: absolute;
@@ -642,6 +746,15 @@ input[type="number"] {
 
 .country.correct { fill: var(--good); stroke: #eafff6; stroke-width: 0.7; }
 .country.wrong   { fill: var(--bad); stroke: #ffe4e4; stroke-width: 0.7; }
+
+/* Shape mode: the country whose shape you must name is lit up in the accent
+   color while you type. */
+.country.shape-target { fill: var(--accent); stroke: #fff; stroke-width: 1; }
+.hl.shape-target { stroke: var(--accent); stroke-width: 3; }
+
+/* Shape mode: everything except the target country is hidden so ONLY the one
+   country's shape is on screen. */
+.shape-hide { visibility: hidden; pointer-events: none; }
 
 /* The answer ring flashes too for extra visibility. (The country FILL pulse is
    driven by JS in flashAnswer(), which renders reliably on every device.) */

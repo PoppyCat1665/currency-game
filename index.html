@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Currency Guessing Game</title>
   <link rel="stylesheet" href="styles.css?v=48">
 </head>
@@ -22,17 +22,24 @@
 
     <div class="menu-card">
       <h1>PoppyCat1665's Test Practice Site</h1>
-      <p class="subtitle">A fast study tool to memorize currencies, country codes, and U.S. states before your MED exam.</p>
+      <p class="subtitle">A fast study tool to memorize currencies, country codes, country shapes, and U.S. states before your MED exam.</p>
 
       <div class="mode-buttons">
-        <label class="rank-toggle mode-switch" for="rankModeInput">
-          <span class="rank-label">😈 RANKED</span>
-          <input id="rankModeInput" type="checkbox">
-        </label>
+        <div class="mode-switches">
+          <label class="rank-toggle mode-switch" for="rankModeInput">
+            <span class="rank-label">😈 RANKED</span>
+            <input id="rankModeInput" type="checkbox">
+          </label>
+          <label class="exam-toggle mode-switch" for="examModeInput">
+            <span class="exam-label">📚 EXAM</span>
+            <input id="menuExamModeInput" type="checkbox">
+          </label>
+        </div>
         <div class="mode-row">
           <button id="currencyBtn" class="btn primary mode-btn">🌍 &nbsp;CURRENCY</button>
           <button id="codesBtn" class="btn primary mode-btn">🌐 &nbsp;COUNTRY CODES</button>
           <button id="statesBtn" class="btn primary mode-btn">🇺🇸 &nbsp;U.S. STATES</button>
+          <button id="shapeBtn" class="btn primary mode-btn">🧩 &nbsp;SHAPE</button>
         </div>
         <div class="mode-name-toggles">
           <label class="setting toggle">
@@ -45,15 +52,15 @@
           </label>
         </div>
       </div>
-      <p class="mode-subtitle">Guess countries by currency or 2-letter code — or identify U.S. states on a map. Toggle RANKED for a hardcore run.</p>
+      <p class="mode-subtitle">Guess countries by currency, 2-letter code, or shape — or identify U.S. states on a map. Toggle RANKED for a hardcore run.</p>
 
       <button id="settingsBtn" class="btn ghost">⚙ &nbsp;SETTINGS</button>
       <button id="replayBtn" class="btn ghost">🎬 &nbsp;REPLAY</button>
       <input id="replayFileInput" type="file" accept="application/json,.json" class="hidden">
 
-      <p class="hint">Pick a subject, then click the correct country or state before time runs out.</p>
+      <p class="hint">Pick a subject, then click the correct country or state — or type the country's name — before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v4.8</p>
+      <p class="version" id="appVersion">v4.9</p>
     </div>
   </div>
 
@@ -83,8 +90,8 @@
             <h3>Gameplay</h3>
             <label class="setting">
               <span>Guess Time</span>
-              <span class="info-icon" data-info="Ranked: fixed at 5s">ⓘ</span>
-              <input id="guessTimeInput" type="number" min="1" max="30" step="1" value="7">
+              <span class="info-icon" data-info="Ranked: fixed at 13s">ⓘ</span>
+              <input id="guessTimeInput" type="number" min="1" max="30" step="1" value="20">
               <span class="unit">seconds</span>
             </label>
             <label class="setting toggle">
@@ -169,11 +176,11 @@
 
           <section class="cat-section" data-section="study">
             <h3>Study</h3>
-            <label class="setting toggle" title="ON: use only the classic exam list.">
+            <label class="setting toggle" title="ON: only large countries in Europe, South America, and Africa.">
               <span>📚 Exam Mode</span>
               <input id="examModeInput" type="checkbox">
             </label>
-            <p class="setting-note">Practice under conditions similar to your test, using only the classic study list.</p>
+            <p class="setting-note">Practice under test conditions using only the large countries in Europe, South America, and Africa.</p>
           </section>
 
           <section class="cat-section" data-section="questionlists">
@@ -202,6 +209,7 @@
               </div>
               <div id="codesList" class="country-list"></div>
               <p class="setting-note">Country Codes Mode only asks about the enabled countries. Disabled countries never appear. Ignored in Ranked mode.</p>
+              <p class="setting-note hidden" id="codesDisabledNote">Disabled while 📚 Exam Mode is on.</p>
             </div>
             <div class="question-list-block">
               <h4>🇺🇸 State List</h4>
@@ -336,6 +344,10 @@
     <div class="map-wrapper">
       <svg id="map" role="img" aria-label="World map"></svg>
       <div id="tooltip" class="hidden"></div>
+      <div id="shapeGuess" class="shape-guess hidden">
+        <input id="shapeInput" type="text" placeholder="Type the country name…" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done">
+        <div id="shapeSuggest" class="shape-suggest hidden"></div>
+      </div>
       <button id="resetViewBtn" class="btn small">Reset View</button>
       <div id="mapLoading" class="map-loading">Loading map…</div>
       <div id="countdownOverlay" class="countdown-overlay hidden">
