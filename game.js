@@ -1041,11 +1041,14 @@ function startGame() {
     ? Math.max(0, parseInt($("#intervalTimeInput").value, 10) || 3)
     : 0; // interval off -> skip straight to the next round
   const maxGuesses = Math.max(1, parseInt($("#maxGuessesInput").value, 10) || 1);
-  // Click radius is per-subject: currency uses its own setting, states uses the
-  // state setting (default 100).
-  const snapRadiusKm = gameSubject === "states"
-    ? Math.max(0, parseFloat($("#snapRadiusStateInput").value) || 100)
-    : Math.max(0, parseFloat($("#snapRadiusCurrencyInput").value) || 1000);
+  // Click radius: ranked forces a fixed hard radius per subject (150 km on the
+  // world map for currency & codes, 50 km for states). Casual uses the
+  // per-subject setting (currency default 1000, state default 100).
+  const snapRadiusKm = rankMode
+    ? (gameSubject === "states" ? 50 : 150)
+    : (gameSubject === "states"
+      ? Math.max(0, parseFloat($("#snapRadiusStateInput").value) || 100)
+      : Math.max(0, parseFloat($("#snapRadiusCurrencyInput").value) || 1000));
 
   // Read display & sound preferences for this session. The "show full name"
   // toggle is per-subject (country vs state) and is always forced off in rank.
@@ -2176,9 +2179,11 @@ window.addEventListener("error", ev => {
 });
 
 // ================= Rank mode menu toggle =================
-// When rank mode is switched ON the menu settings visibly change to the
-// forced hard values (5s, interval off, 1 guess, 250 km radius) and the whole
-// menu turns red. Switching OFF restores the user's previous inputs.
+// When rank mode is switched ON the menu visibly changes (the whole menu turns
+// red, the full-name toggles are forced off) and ranked play uses fixed hard
+// values: 1 guess, no interval, 150 km click radius on the world map
+// (currency & codes) and 50 km for states. The casual inputs keep the user's
+// own values and are restored when rank is switched off.
 const RANK_BODY_CLASS = "rank-active";
 
 // Sizes of the two question pools, used to bound the Rounds input.
