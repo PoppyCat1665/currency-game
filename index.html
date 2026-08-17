@@ -22,7 +22,7 @@
 
     <div class="menu-card">
       <h1>PoppyCat1665's Test Practice Site</h1>
-      <p class="subtitle">A fast study tool to memorize currencies and U.S. states before your MED exam.</p>
+      <p class="subtitle">A fast study tool to memorize currencies, country codes, and U.S. states before your MED exam.</p>
 
       <div class="mode-buttons">
         <label class="rank-toggle mode-switch" for="rankModeInput">
@@ -31,6 +31,7 @@
         </label>
         <div class="mode-row">
           <button id="currencyBtn" class="btn primary mode-btn">🌍 &nbsp;CURRENCY</button>
+          <button id="codesBtn" class="btn primary mode-btn">🌐 &nbsp;COUNTRY CODES</button>
           <button id="statesBtn" class="btn primary mode-btn">🇺🇸 &nbsp;U.S. STATES</button>
         </div>
         <div class="mode-name-toggles">
@@ -44,7 +45,7 @@
           </label>
         </div>
       </div>
-      <p class="mode-subtitle">Guess countries by currency — or identify U.S. states on a map. Toggle RANKED for a hardcore run.</p>
+      <p class="mode-subtitle">Guess countries by currency or 2-letter code — or identify U.S. states on a map. Toggle RANKED for a hardcore run.</p>
 
       <button id="settingsBtn" class="btn ghost">⚙ &nbsp;SETTINGS</button>
       <button id="replayBtn" class="btn ghost">🎬 &nbsp;REPLAY</button>
@@ -52,7 +53,7 @@
 
       <p class="hint">Pick a subject, then click the correct country or state before time runs out.</p>
       <p class="credit">Made with 💖 by PoppyCat1665 + deepseek v4 flash</p>
-      <p class="version" id="appVersion">v4.7</p>
+      <p class="version" id="appVersion">v4.7-dev1</p>
     </div>
   </div>
 
@@ -191,6 +192,18 @@
               <p class="setting-note hidden" id="countriesDisabledNote">Disabled while 📚 Exam Mode is on.</p>
             </div>
             <div class="question-list-block">
+              <h4>🌐 Country Code List</h4>
+              <div class="country-filter-bar">
+                <input id="codesSearch" type="text" placeholder="Search countries…">
+                <div class="country-filter-actions">
+                  <button id="codesAllBtn" class="btn tiny">All</button>
+                  <button id="codesNoneBtn" class="btn tiny">None</button>
+                </div>
+              </div>
+              <div id="codesList" class="country-list"></div>
+              <p class="setting-note">Country Codes Mode only asks about the enabled countries. Disabled countries never appear. Ignored in Ranked mode.</p>
+            </div>
+            <div class="question-list-block">
               <h4>🇺🇸 State List</h4>
               <div class="country-filter-bar">
                 <input id="stateSearch" type="text" placeholder="Search states…">
@@ -265,7 +278,7 @@
         </button>
         <button class="rank-opt" data-rounds="all">
           RANK <span id="rankAllCount">–</span>
-          <span class="rank-opt-sub">every available currency</span>
+          <span class="rank-opt-sub">every available option</span>
         </button>
       </div>
       <div class="settings-footer">
@@ -380,6 +393,7 @@
   <script src="continents.js?v=48"></script>
   <script src="data.js?v=48"></script>
   <script src="states.js?v=48"></script>
+  <script src="countrycodes.js?v=48"></script>
   <script src="game.js?v=48"></script>
 </body>
 </html>

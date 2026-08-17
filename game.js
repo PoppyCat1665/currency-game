@@ -1,4 +1,4 @@
-/* global d3, topojson, WORLD_TOPOJSON, CURRENCIES, EXAM_CURRENCIES, COUNTRY_CONTINENT */
+/* global d3, topojson, WORLD_TOPOJSON, CURRENCIES, EXAM_CURRENCIES, COUNTRY_CONTINENT, COUNTRY_CODES */
 
 "use strict";
 
@@ -173,11 +173,17 @@ let countryList = [];
 // Only applies to casual (non-rank, non-exam) play.
 const selectedCountries = new Set();
 
-// ===== Subject (Currency world map vs U.S. States map) =====
-// The active subject ("currency" | "states"). The world-map globals above
-// (countryFeatures/countryBoundaries/countryById/countryList) are re-pointed
-// to the state datasets when the subject is "states", so every map function
-// (labels, hit-testing, rings, names) works for both maps unchanged.
+// Country Codes toggle selection: a Set of numeric country ids for the
+// COUNTRY CODES mode's own question list. Empty means "all".
+const selectedCodes = new Set();
+
+// ===== Subject (Currency world map / Country Codes map vs U.S. States map) =====
+// The active subject ("currency" | "states" | "codes"). The world-map globals
+// above (countryFeatures/countryBoundaries/countryById/countryList) are
+// re-pointed to the state datasets when the subject is "states", so every map
+// function (labels, hit-testing, rings, names) works for both maps unchanged.
+// "codes" is the world map too — it just asks the short 2-letter code instead
+// of the currency.
 let gameSubject = "currency";
 
 // Frozen world datasets (built once in initMap) so we can swap back to them.
@@ -242,11 +248,24 @@ function activateSubject(subject) {
     countryById = stateById;
     countryList = stateList;
   } else {
+    // "currency" and "codes" both play on the world map.
     countryFeatures = worldFeatures;
     countryBoundaries = worldBoundaries;
     countryById = worldById;
     countryList = worldList;
   }
+}
+
+// Canonical question pool for COUNTRY CODES mode: every mapped country that
+// has a 2-letter code, deduplicated by id. world-atlas ships a couple of
+// duplicate-id features (e.g. Australia plus its Ashmore and Cartier Is.
+// outpost share id 36); the last one wins so the name matches the map labels.
+function codedCountries() {
+  const byId = new Map();
+  countryList.forEach(c => {
+    if (COUNTRY_CODES[c.id]) byId.set(c.id, { ...c, code: COUNTRY_CODES[c.id] });
+  });
+  return [...byId.values()];
 }
 
 // localStorage key for persisting all settings.
@@ -399,10 +418,11 @@ function initMap() {
   $("#mapLoading").classList.add("hidden");
 }
 
-// Switch the active map between "currency" (world) and "states" (US).
-// Re-points the active feature globals and re-renders the map paths.
+// Switch the active map between "currency" (world), "codes" (world, prompts
+// the 2-letter country code), and "states" (US). Re-points the active feature
+// globals and re-renders the map paths.
 function setSubject(subject) {
-  if (subject !== "states") subject = "currency";
+  if (subject !== "states" && subject !== "codes") subject = "currency";
   activateSubject(subject);
   if (!mapG) return;
 
@@ -1029,11 +1049,14 @@ function startGame() {
 
   // Read display & sound preferences for this session. The "show full name"
   // toggle is per-subject (country vs state) and is always forced off in rank.
+  // Country Codes mode always shows the short code, never the full name.
   const showFullName = rankMode
     ? false
     : (gameSubject === "states"
       ? $("#showFullStateNameInput").checked
-      : $("#showFullCountryNameInput").checked);
+      : (gameSubject === "codes"
+        ? false
+        : $("#showFullCountryNameInput").checked));
   const showCountryNames = $("#showCountryNamesInput").checked;
   const tapSelect = $("#tapSelectInput").checked;
   soundsEnabled = $("#soundInput").checked;
@@ -1074,6 +1097,24 @@ function startGame() {
       symbol: s.abbr,
       countries: [s.code]       // the FIPS id of the state itself
     }));
+  } else if (gameSubject === "codes") {
+    // Country Codes mode: every mapped country is a question. The prompt is
+    // its 2-letter ISO code (e.g. "JP"); the answer is the country itself.
+    questions = codedCountries().map(c => ({
+      code: c.code,
+      name: c.name,
+      symbol: c.code,
+      countries: [c.id]       // the numeric id of the country itself
+    }));
+    // Country toggle: only in casual (not ranked). Restrict to toggled-on
+    // countries in the Country Code List, if any are unselected.
+    if (!rankMode && selectedCodes.size > 0 && selectedCodes.size < countryList.length) {
+      questions = questions.filter(q => q.countries.some(id => selectedCodes.has(id)));
+    }
+    if (questions.length === 0) {
+      showToast("⚠ No countries selected — enable at least one country in Settings → Question Lists → Country Code List", false);
+      return;
+    }
   } else {
     // Currency mode: build from the real currency data. In 📚 Exam mode,
     // restrict to ONLY the classic study list (EXAM_CURRENCIES). Otherwise use
@@ -1161,6 +1202,14 @@ function startGame() {
           ? [...selectedStates]
           : US_STATE_LIST.map(s => s.code);
         return { normal: active, ranked: active, exam: active };
+      }
+      // Country Codes mode: no exam list — the pool is every mapped country.
+      if (gameSubject === "codes") {
+        const allCoded = codedCountries().map(c => c.id);
+        const active = selectedCodes.size > 0 && selectedCodes.size < countryList.length
+          ? [...selectedCodes]
+          : allCoded;
+        return { normal: active, ranked: allCoded, exam: allCoded };
       }
       // In exam mode the toggle selection is temporarily swapped to the exam
       // list, so "Normal Mode" should reflect the user's real selection.
@@ -1306,9 +1355,12 @@ function showQuestion() {
     $("#currencyName").textContent = q.code;
   }
   // States show just the abbreviation under the name; currencies show the
-  // symbol + code.
+  // symbol + code. Country Codes mode shows the code as the prompt (the
+  // full name is only shown after the answer is revealed).
   if (game.subject === "states") {
     $("#currencySymbol").textContent = q.symbol || "";
+  } else if (game.subject === "codes") {
+    $("#currencySymbol").textContent = game.showFullName ? q.name : "";
   } else {
     $("#currencySymbol").textContent = q.symbol ? `${q.symbol}   ·   ${q.code}` : q.code;
   }
@@ -1351,7 +1403,7 @@ function resolveQuestion(clickedId) {
       updateStreakPill();
     }
     finishQuestion(q);
-    if (game.subject === "states") {
+    if (game.subject === "states" || game.subject === "codes") {
       showFeedback("info", `⏰ Time's up! The answer was: ${q.name}`);
     } else {
       showFeedback("info", `⏰ Time's up! ${q.name} is used in: ${answerLabelFor(q)}`);
@@ -1401,6 +1453,8 @@ function resolveQuestion(clickedId) {
       showScorePop("+" + (gained + streakBonus), "good-pop");
       if (game.subject === "states") {
         showFeedback("ok", `✅ Correct! ${q.name} (+${speedBonus} speed)`);
+      } else if (game.subject === "codes") {
+        showFeedback("ok", `✅ Correct! ${q.code} → ${q.name} (+${speedBonus} speed)`);
       } else {
         showFeedback("ok", `✅ Correct! ${q.name} → ${shown} (+${speedBonus} speed)`);
       }
@@ -1411,6 +1465,8 @@ function resolveQuestion(clickedId) {
       showScorePop("+1", "good-pop");
       if (game.subject === "states") {
         showFeedback("ok", `✅ Correct! ${q.name}`);
+      } else if (game.subject === "codes") {
+        showFeedback("ok", `✅ Correct! ${q.code} → ${q.name}`);
       } else {
         showFeedback("ok", `✅ Correct! ${q.name} → ${shown}`);
       }
@@ -1448,7 +1504,7 @@ function resolveQuestion(clickedId) {
     // Out of attempts — mark failed and reveal the answer.
     game.incorrect++;
     finishQuestion(q);
-    if (game.subject === "states") {
+    if (game.subject === "states" || game.subject === "codes") {
       showFeedback("no", `❌ Out of guesses! The answer was: ${q.name}`);
     } else {
       showFeedback("no", `❌ Out of guesses! ${q.name} is used in: ${answerLabelFor(q)}`);
@@ -1759,10 +1815,11 @@ function runReplay(data) {
   $("#countdownOverlay").classList.add("hidden");
 
   // Swap the map to the recorded subject so rings/labels/hit-testing line up.
-  setSubject(m.subject === "states" ? "states" : "currency");
+  const subj = m.subject === "states" ? "states" : (m.subject === "codes" ? "codes" : "currency");
+  setSubject(subj);
 
   game = {
-    subject: m.subject === "states" ? "states" : "currency",
+    subject: subj,
     questions: (m.questions || []).map(q => ({ ...q })),
     total: (m.questions || []).length,
     index: 0,
@@ -1983,6 +2040,8 @@ function applyReplayEvent(ev) {
         $("#currencyName").textContent = game.showFullName ? q.name : q.code;
         if (game.subject === "states") {
           $("#currencySymbol").textContent = q.symbol || "";
+        } else if (game.subject === "codes") {
+          $("#currencySymbol").textContent = game.showFullName ? q.name : "";
         } else {
           $("#currencySymbol").textContent = q.symbol ? `${q.symbol}   ·   ${q.code}` : q.code;
         }
@@ -2128,13 +2187,15 @@ const EXAM_COUNT = CURRENCIES.filter(c => EXAM_LIST.has(c.code)).length;
 const FULL_COUNT = CURRENCIES.length;
 
 // Bound the Rounds input to the size of the active pool: EXAM_COUNT in 📚
-// mode, FULL_COUNT (or the number of states) otherwise. Never lets the user
-// request more than exists.
+// mode, FULL_COUNT (or the number of states / coded countries) otherwise.
+// Never lets the user request more than exists.
 function syncRoundsMax() {
   const roundsEl = $("#roundsInput");
   const max = gameSubject === "states"
     ? US_STATE_LIST.length
-    : ($("#examModeInput").checked ? EXAM_COUNT : FULL_COUNT);
+    : (gameSubject === "codes"
+      ? codedCountries().length
+      : ($("#examModeInput").checked ? EXAM_COUNT : FULL_COUNT));
   roundsEl.max = max;
   const v = parseInt(roundsEl.value, 10);
   if (Number.isFinite(v) && v > roundsEl.max) roundsEl.value = roundsEl.max;
@@ -2233,6 +2294,7 @@ function saveSettings() {
       examMode: $("#examModeInput").checked,
       playerName: $("#playerNameInput").value,
       countries: [...selectedCountries],
+      codes: [...selectedCodes],
       states: [...selectedStates]
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
@@ -2267,6 +2329,10 @@ function loadSettings() {
       selectedCountries.clear();
       d.countries.forEach(id => selectedCountries.add(Number(id)));
     }
+    if (Array.isArray(d.codes)) {
+      selectedCodes.clear();
+      d.codes.forEach(id => selectedCodes.add(Number(id)));
+    }
     if (Array.isArray(d.states)) {
       selectedStates.clear();
       d.states.forEach(id => selectedStates.add(String(id)));
@@ -2282,6 +2348,14 @@ function initSelectedCountries() {
   }
 }
 
+// ================= Country Code toggle =================
+// Default: every country selected (i.e. no restriction).
+function initSelectedCodes() {
+  if (selectedCodes.size === 0 && countryList.length) {
+    countryList.forEach(c => selectedCodes.add(c.id));
+  }
+}
+
 // ================= State toggle =================
 // Default: every U.S. state selected.
 function initSelectedStates() {
@@ -2290,20 +2364,34 @@ function initSelectedStates() {
   }
 }
 
-// Build one toggle row for a country.
-function makeCountryRow(c) {
+// ================= Country / Country Code toggle lists =================
+// Both the Country List and the Country Code List manage the same world
+// countries but keep their own selection set (selectedCountries vs
+// selectedCodes), so toggling one never affects the other.
+
+// Which selection set a toggle-list element belongs to.
+function selForList(el) {
+  const list = el && el.closest && el.closest(".country-list");
+  if (!list) return selectedCountries;
+  if (list.id === "codesList") return selectedCodes;
+  if (list.id === "stateList") return selectedStates;
+  return selectedCountries;
+}
+
+// Build one toggle row for a country in the given selection set.
+function makeCountryRow(c, selSet) {
   const label = document.createElement("label");
   label.className = "country-toggle";
   label.dataset.name = c.name.toLowerCase();
   const cb = document.createElement("input");
   cb.type = "checkbox";
-  cb.checked = selectedCountries.has(c.id);
+  cb.checked = selSet.has(c.id);
   cb.dataset.id = c.id;
   cb.addEventListener("change", () => {
-    if (cb.checked) selectedCountries.add(c.id);
-    else selectedCountries.delete(c.id);
+    if (cb.checked) selSet.add(c.id);
+    else selSet.delete(c.id);
     saveSettings();
-    updateContinentCounts();
+    updateContinentCounts(label.closest(".country-list"));
   });
   const span = document.createElement("span");
   span.textContent = c.name;
@@ -2313,7 +2401,8 @@ function makeCountryRow(c) {
 }
 
 // Toggle every country inside a continent heading on/off.
-function toggleContinent(head) {
+function toggleContinent(head, selSet) {
+  const container = head.parentElement;
   const rows = [];
   let el = head.nextElementSibling;
   while (el && !el.classList.contains("country-continent")) {
@@ -2325,17 +2414,20 @@ function toggleContinent(head) {
   rows.forEach(r => {
     const cb = r.querySelector("input");
     cb.checked = !allOn;
-    const id = Number(cb.dataset.id);
-    if (cb.checked) selectedCountries.add(id);
-    else selectedCountries.delete(id);
+    const raw = cb.dataset.id;
+    const id = (selSet === selectedStates) ? raw : Number(raw);
+    if (cb.checked) selSet.add(id);
+    else selSet.delete(id);
   });
   saveSettings();
-  updateContinentCounts();
+  updateContinentCounts(container);
 }
 
 // Refresh each continent heading's checkbox + "selected / total" badge.
-function updateContinentCounts() {
-  document.querySelectorAll(".country-continent").forEach(head => {
+function updateContinentCounts(container) {
+  container = container || document.getElementById("countryList");
+  if (!container) return;
+  container.querySelectorAll(".country-continent").forEach(head => {
     let total = 0, sel = 0;
     let el = head.nextElementSibling;
     while (el && !el.classList.contains("country-continent")) {
@@ -2357,14 +2449,14 @@ function updateContinentCounts() {
 
 const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Antarctica"];
 
-function renderCountryList() {
-  const container = $("#countryList");
+// Render a continent-grouped country list into a container for a selection set.
+function renderContinentList(container, items, selSet) {
   if (!container) return;
   container.innerHTML = "";
 
   // Group countries by continent (from COUNTRY_CONTINENT), keeping name order.
   const groups = {};
-  countryList.forEach(c => {
+  items.forEach(c => {
     const cont = COUNTRY_CONTINENT[c.id] || "Other";
     (groups[cont] = groups[cont] || []).push(c);
   });
@@ -2376,7 +2468,7 @@ function renderCountryList() {
     const check = document.createElement("input");
     check.type = "checkbox";
     check.className = "cont-check";
-    check.addEventListener("change", () => toggleContinent(head));
+    check.addEventListener("change", () => toggleContinent(head, selSet));
     const name = document.createElement("span");
     name.textContent = cont;
     const badge = document.createElement("span");
@@ -2385,7 +2477,7 @@ function renderCountryList() {
     head.appendChild(name);
     head.appendChild(badge);
     container.appendChild(head);
-    groups[cont].forEach(c => container.appendChild(makeCountryRow(c)));
+    groups[cont].forEach(c => container.appendChild(makeCountryRow(c, selSet)));
     delete groups[cont];
   };
 
@@ -2395,15 +2487,31 @@ function renderCountryList() {
   // Any ungrouped fall into "Other" at the end.
   if (groups.Other && groups.Other.length) appendHeading("Other");
 
-  updateContinentCounts();
+  updateContinentCounts(container);
+}
+
+function renderCountryList() {
+  renderContinentList(document.getElementById("countryList"), countryList, selectedCountries);
+}
+
+function renderCodesList() {
+  renderContinentList(document.getElementById("codesList"), countryList, selectedCodes);
 }
 
 function setAllCountries(on) {
   selectedCountries.clear();
   if (on) countryList.forEach(c => selectedCountries.add(c.id));
-  document.querySelectorAll(".country-toggle input").forEach(cb => { cb.checked = on; });
+  document.querySelectorAll("#countryList .country-toggle input").forEach(cb => { cb.checked = on; });
   saveSettings();
-  updateContinentCounts();
+  updateContinentCounts(document.getElementById("countryList"));
+}
+
+function setAllCodes(on) {
+  selectedCodes.clear();
+  if (on) countryList.forEach(c => selectedCodes.add(c.id));
+  document.querySelectorAll("#codesList .country-toggle input").forEach(cb => { cb.checked = on; });
+  saveSettings();
+  updateContinentCounts(document.getElementById("codesList"));
 }
 
 // ================= State List (Question Lists settings) =================
@@ -2421,7 +2529,7 @@ function makeStateRow(s) {
     else selectedStates.delete(s.code);
     saveSettings();
     updateStateCount();
-    updateStateColCounts();
+    updateContinentCounts(label.closest(".country-list"));
   });
   const span = document.createElement("span");
   span.textContent = s.name;
@@ -2430,9 +2538,10 @@ function makeStateRow(s) {
   return label;
 }
 
-// Render every U.S. state as an individual toggle, respecting the search box,
-// split into two side-by-side parts (Left / Right columns). Each column has a
-// checkbox that selects/deselects all of its states (like the continent list).
+// Render every U.S. state as an individual toggle, respecting the search box.
+// Uses the same grid + heading design as the Country / Country Code lists: a
+// single "United States" heading (styled like a continent heading) toggles all
+// states at once.
 function renderStateList() {
   const container = $("#stateList");
   if (!container) return;
@@ -2442,69 +2551,25 @@ function renderStateList() {
   const visible = US_STATE_LIST.filter(s =>
     !q || s.name.toLowerCase().includes(q) || s.abbr.toLowerCase().includes(q));
 
-  // Divide the filtered states into two halves: Left and Right.
-  const half = Math.ceil(visible.length / 2);
+  const head = document.createElement("div");
+  head.className = "country-continent";
+  const check = document.createElement("input");
+  check.type = "checkbox";
+  check.className = "cont-check";
+  check.addEventListener("change", () => toggleContinent(head, selectedStates));
+  const name = document.createElement("span");
+  name.textContent = "United States";
+  const badge = document.createElement("span");
+  badge.className = "cont-count";
+  head.appendChild(check);
+  head.appendChild(name);
+  head.appendChild(badge);
+  container.appendChild(head);
 
-  const buildCol = (items, label) => {
-    const wrap = document.createElement("div");
-    wrap.className = "state-col";
-    wrap.dataset.col = label.toLowerCase();
-
-    const head = document.createElement("div");
-    head.className = "state-col-head";
-    const check = document.createElement("input");
-    check.type = "checkbox";
-    check.className = "cont-check";
-    check.addEventListener("change", () => toggleStateCol(wrap));
-    const name = document.createElement("span");
-    name.textContent = label;
-    const badge = document.createElement("span");
-    badge.className = "cont-count";
-    head.appendChild(check);
-    head.appendChild(name);
-    head.appendChild(badge);
-    wrap.appendChild(head);
-
-    items.forEach(s => wrap.appendChild(makeStateRow(s)));
-    return wrap;
-  };
-
-  container.appendChild(buildCol(visible.slice(0, half), "Left"));
-  container.appendChild(buildCol(visible.slice(half), "Right"));
+  visible.forEach(s => container.appendChild(makeStateRow(s)));
 
   updateStateCount();
-  updateStateColCounts();
-}
-
-// Toggle every state inside a Left/Right column heading.
-function toggleStateCol(col) {
-  const rows = [...col.querySelectorAll(".state-toggle input")];
-  if (!rows.length) return;
-  const allOn = rows.every(cb => cb.checked);
-  rows.forEach(cb => {
-    cb.checked = !allOn;
-    if (cb.checked) selectedStates.add(cb.dataset.id);
-    else selectedStates.delete(cb.dataset.id);
-  });
-  saveSettings();
-  updateStateCount();
-  updateStateColCounts();
-}
-
-// Refresh each column heading's checkbox + "selected / total" badge.
-function updateStateColCounts() {
-  document.querySelectorAll(".state-col").forEach(col => {
-    const rows = [...col.querySelectorAll(".state-toggle input")];
-    const total = rows.length;
-    const sel = rows.filter(cb => cb.checked).length;
-    const badge = col.querySelector(".cont-count");
-    if (badge) badge.textContent = sel + " / " + total;
-    const check = col.querySelector(".cont-check");
-    if (check) {
-      check.checked = total > 0 && sel === total;
-      check.indeterminate = sel > 0 && sel < total;
-    }
-  });
+  updateContinentCounts(container);
 }
 
 // Show a small "X / N selected" summary for the State List.
@@ -2521,7 +2586,7 @@ function setAllStates(on) {
   document.querySelectorAll("#stateList input").forEach(cb => { cb.checked = on; });
   saveSettings();
   updateStateCount();
-  updateStateColCounts();
+  updateContinentCounts(document.getElementById("stateList"));
 }
 
 // Country ids covered by 📚 Exam mode (the countries used by EXAM_CURRENCIES).
@@ -2585,8 +2650,15 @@ function closeOverlay(id) {
 // Ranked rounds for the current subject. "all" = every available question.
 let pendingRankRounds = "all";
 
-// Open the rank-size picker (currency only — states always plays every state).
+// Open the rank-size picker (states always plays every state; codes and
+// currency let you choose a round count).
 function openRankPicker() {
+  // Country Codes mode: the pool is every mapped country with a code.
+  if (gameSubject === "codes") {
+    $("#rankAllCount").textContent = codedCountries().length;
+    openOverlay("rankPicker");
+    return;
+  }
   // With Exam mode on (currency only), there's no rank-size choice: play the
   // full exam list (EXAM_COUNT rounds) directly, without showing the picker.
   if ($("#examModeInput").checked) {
@@ -2693,6 +2765,7 @@ function resetDefaults() {
   $("#bgEffectsInput").checked = true;
   $("#bgRateInput").value = "100";
   setAllCountries(true);   // reset country toggles to all-on
+  setAllCodes(true);       // reset country-code toggles to all-on
   setAllStates(true);      // reset state toggles to all-on
   syncRoundsMax();
   syncIntervalState();
@@ -3065,8 +3138,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // render the country toggles and apply menu state.
   loadSettings();
   initSelectedCountries();
+  initSelectedCodes();
   initSelectedStates();
   renderCountryList();
+  renderCodesList();
   renderStateList();
   addPerSettingReset();
   applyTheme();                    // apply chosen Normal/Rank colors
@@ -3100,25 +3175,35 @@ document.addEventListener("DOMContentLoaded", () => {
   // Pulse toggle applied live.
   $("#pulseToggleInput").addEventListener("change", () => setPulse($("#pulseToggleInput").checked));
 
-  // Country toggle controls.
-  $("#countrySearch").addEventListener("input", e => {
-    const q = e.target.value.toLowerCase();
-    document.querySelectorAll(".country-toggle").forEach(row => {
-      row.style.display = row.dataset.name.includes(q) ? "" : "none";
+  // Country & Country Code toggle controls. Both lists filter their own rows
+  // by search, so searching one list never hides the other.
+  function bindCountrySearch(inputId, containerId) {
+    const input = $(inputId);
+    const container = $(containerId);
+    if (!input || !container) return;
+    input.addEventListener("input", e => {
+      const q = e.target.value.toLowerCase();
+      container.querySelectorAll(".country-toggle").forEach(row => {
+        row.style.display = row.dataset.name.includes(q) ? "" : "none";
+      });
+      // Hide continent headings that have no visible countries.
+      container.querySelectorAll(".country-continent").forEach(head => {
+        let visible = 0;
+        let el = head.nextElementSibling;
+        while (el && !el.classList.contains("country-continent")) {
+          if (el.style.display !== "none") visible++;
+          el = el.nextElementSibling;
+        }
+        head.style.display = visible ? "" : "none";
+      });
     });
-    // Hide continent headings that have no visible countries.
-    document.querySelectorAll(".country-continent").forEach(head => {
-      let visible = 0;
-      let el = head.nextElementSibling;
-      while (el && !el.classList.contains("country-continent")) {
-        if (el.style.display !== "none") visible++;
-        el = el.nextElementSibling;
-      }
-      head.style.display = visible ? "" : "none";
-    });
-  });
+  }
+  bindCountrySearch("countrySearch", "countryList");
+  bindCountrySearch("codesSearch", "codesList");
   $("#countryAllBtn").addEventListener("click", () => setAllCountries(true));
   $("#countryNoneBtn").addEventListener("click", () => setAllCountries(false));
+  $("#codesAllBtn").addEventListener("click", () => setAllCodes(true));
+  $("#codesNoneBtn").addEventListener("click", () => setAllCodes(false));
 
   // State List controls (Question Lists settings).
   $("#stateSearch").addEventListener("input", renderStateList);
@@ -3126,31 +3211,33 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#stateNoneBtn").addEventListener("click", () => setAllStates(false));
   // Clicking a continent heading toggles every country in it. Clicking the
   // heading's own checkbox is handled by its change event, so ignore it here
-  // to avoid toggling twice.
+  // to avoid toggling twice. Each list (Country / Codes / States) uses its own
+  // selection set via selForList.
   document.addEventListener("click", e => {
     const head = e.target.closest && e.target.closest(".country-continent");
     if (head && !e.target.closest(".cont-check")) {
       e.preventDefault();
-      toggleContinent(head);
-    }
-  });
-  // Same for the State List's Left/Right column headings.
-  document.addEventListener("click", e => {
-    const head = e.target.closest && e.target.closest(".state-col-head");
-    if (head && !e.target.closest(".cont-check")) {
-      e.preventDefault();
-      toggleStateCol(head.closest(".state-col"));
+      toggleContinent(head, selForList(head));
     }
   });
   // Exam mode disables the country toggle.
   syncCountriesState();
   $("#examModeInput").addEventListener("change", syncCountriesState);
 
-  // Mode buttons: CURRENCY / U.S. STATES. The RANKED switch controls rank
-  // mode. When on, CURRENCY opens the rank-size picker (50/70/100/all);
-  // U.S. STATES goes straight to the map and plays every state.
+  // Mode buttons: CURRENCY / COUNTRY CODES / U.S. STATES. The RANKED switch
+  // controls rank mode. When on, CURRENCY and COUNTRY CODES open the rank-size
+  // picker (50/70/100/all); U.S. STATES goes straight to the map and plays
+  // every state.
   $("#currencyBtn").addEventListener("click", () => {
     setSubject("currency");
+    if ($("#rankModeInput").checked) {
+      openRankPicker();
+    } else {
+      startGame();
+    }
+  });
+  $("#codesBtn").addEventListener("click", () => {
+    setSubject("codes");
     if ($("#rankModeInput").checked) {
       openRankPicker();
     } else {

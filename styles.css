@@ -1208,12 +1208,23 @@ body.rank-active .credit { color: var(--rank-faint); }
 }
 .mode-switch .rank-label { font-size: 18px; letter-spacing: 2px; }
 
-/* Each subject has its own row: main button + ranked button side by side. */
+/* Each subject gets a full-width button. Three mode buttons stack vertically
+   so their labels always fit on a single centered line (two-per-row would
+   wrap/clip the longer labels like "COUNTRY CODES"). */
 .mode-row {
   display: flex;
+  flex-direction: column;
   gap: 10px;
 }
-.mode-row .mode-btn { flex: 1; }
+.mode-row .mode-btn {
+  flex: 1 1 100%;
+  width: 100%;
+  padding: 16px 18px;
+  font-size: 16px;
+  letter-spacing: 1px;
+  text-align: center;
+  white-space: nowrap;
+}
 
 /* Full-name toggles shown directly under the play buttons. */
 .mode-name-toggles {
@@ -1237,9 +1248,6 @@ body.rank-active .credit { color: var(--rank-faint); }
 
 .mode-btn {
   width: 100%;
-  padding: 18px 24px;
-  font-size: 20px;
-  letter-spacing: 1.5px;
   text-align: center;
 }
 
@@ -1481,7 +1489,7 @@ body.rank-active .credit { color: var(--rank-faint); }
 .country-toggle input { flex-shrink: 0; accent-color: var(--accent); width: 16px; height: 16px; }
 .country-toggle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Question Lists category: two stacked list managers (Country + State). */
+/* Question Lists category: three stacked list managers (Country + Codes + State). */
 .question-list-block {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -1498,43 +1506,8 @@ body.rank-active .credit { color: var(--rank-faint); }
 .question-list-block .country-list { max-height: 220px; }
 .question-list-block .country-toggle { font-size: 12px; }
 
-/* State List: two side-by-side parts (Left / Right). */
-#stateList {
-  display: flex;
-  gap: 12px;
-}
-.state-col {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.state-col-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 2px;
-  padding: 4px 6px;
-  border-radius: 8px;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.15s, color 0.15s;
-}
-.state-col-head:hover { background: rgba(76, 201, 240, 0.1); color: #fff; }
-.state-col-head .cont-count {
-  margin-left: auto;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  letter-spacing: 0;
-}
-.state-col .country-toggle { width: 100%; }
+/* The State List uses the exact same grid + continent-heading design as the
+   Country / Country Code lists for a consistent checkbox look. */
 
 .setting select.setting-select,
 .setting-select {
