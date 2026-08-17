@@ -1060,7 +1060,7 @@ function startGame() {
       : (gameSubject === "codes"
         ? false
         : $("#showFullCountryNameInput").checked));
-  const showCountryNames = $("#showCountryNamesInput").checked;
+  const showCountryNames = rankMode ? false : $("#showCountryNamesInput").checked;
   const tapSelect = $("#tapSelectInput").checked;
   soundsEnabled = $("#soundInput").checked;
 
@@ -2208,13 +2208,14 @@ function syncRoundsMax() {
 
 function applyRankMenuState() {
   const ranked = $("#rankModeInput").checked;
-  // Rank mode only changes how many rounds you play — it never locks or forces
-  // the difficulty settings, so all inputs stay exactly as the user set them.
-  // It just recolors the app to the ranked theme.
+  // Rank mode recolors the app to the ranked theme; the difficulty inputs keep
+  // the user's own values, but ranked play forces harder display rules (no
+  // full names, no country-name labels), so those toggles are locked off.
   document.body.classList.toggle(RANK_BODY_CLASS, ranked);
 
-  // The full-name toggles are always off during ranked (and greyed out).
-  ["showFullCountryNameInput", "showFullStateNameInput"].forEach(id => {
+  // The full-name + country-name toggles are always off during ranked (and
+  // greyed out).
+  ["showFullCountryNameInput", "showFullStateNameInput", "showCountryNamesInput"].forEach(id => {
     const el = $(id);
     if (!el) return;
     el.disabled = ranked;
